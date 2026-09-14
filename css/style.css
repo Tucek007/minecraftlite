@@ -1,0 +1,326 @@
+/* style.css - Minecraft Lite styling */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background-color: #000;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #fff;
+}
+
+#game-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#game-container canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Crosshair */
+#crosshair {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+#crosshair::before, #crosshair::after {
+    content: '';
+    position: absolute;
+    background-color: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 0 1px #000;
+}
+
+#crosshair::before {
+    top: 7px;
+    left: 0;
+    width: 16px;
+    height: 2px;
+}
+
+#crosshair::after {
+    top: 0;
+    left: 7px;
+    width: 2px;
+    height: 16px;
+}
+
+/* F3 Debug Screen */
+#debug-info {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    color: #f0f0f0;
+    font-family: Consolas, 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.45;
+    padding: 8px 12px;
+    border-radius: 4px;
+    border-left: 3px solid #55ff55;
+    pointer-events: none;
+    z-index: 20;
+    display: none;
+    text-shadow: 1px 1px 1px #000;
+}
+
+/* Toast Notifications */
+#toast {
+    position: absolute;
+    top: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(18, 18, 18, 0.88);
+    border: 2px solid #555;
+    border-radius: 4px;
+    color: #ffd700;
+    font-family: Consolas, monospace;
+    font-size: 14px;
+    font-weight: bold;
+    padding: 6px 16px;
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0;
+    transition: opacity 0.25s ease-in-out;
+    text-shadow: 1px 1px 1px #000;
+}
+
+#toast.visible {
+    opacity: 1;
+}
+
+/* HUD Overlay Container */
+#hud {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: auto;
+    z-index: 20;
+}
+
+/* Selected Block Name Prompt */
+#block-prompt {
+    font-family: Consolas, monospace;
+    font-size: 15px;
+    font-weight: bold;
+    color: #ffffff;
+    text-shadow: 2px 2px 0px #000;
+    margin-bottom: 6px;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+/* Hearts Container */
+#hearts-bar {
+    display: flex;
+    gap: 3px;
+    margin-bottom: 6px;
+}
+
+.heart {
+    width: 14px;
+    height: 14px;
+    background: #ff2222;
+    clip-path: path('M7 13.5 C7 13.5 1 9 1 4.5 C1 2 3 0.5 5 1.5 C6 2 7 3.5 7 3.5 C7 3.5 8 2 9 1.5 C11 0.5 13 2 13 4.5 C13 9 7 13.5 7 13.5 Z');
+    filter: drop-shadow(1px 1px 0px #000);
+}
+
+/* Hotbar */
+#hotbar {
+    display: flex;
+    background: rgba(30, 30, 30, 0.75);
+    border: 2px solid #111;
+    border-radius: 4px;
+    padding: 3px;
+    gap: 4px;
+    box-shadow: inset 1px 1px 0 #444, 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.hotbar-slot {
+    width: 44px;
+    height: 44px;
+    background: #8b8b8b;
+    border: 2px solid #373737;
+    border-top-color: #373737;
+    border-left-color: #373737;
+    border-right-color: #ffffff;
+    border-bottom-color: #ffffff;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    image-rendering: pixelated;
+    transition: transform 0.05s ease;
+}
+
+.hotbar-slot:hover {
+    background: #a0a0a0;
+}
+
+.hotbar-slot.active {
+    outline: 3px solid #ffffff;
+    outline-offset: 1px;
+    background: #9c9c9c;
+    z-index: 2;
+    transform: scale(1.08);
+}
+
+.hotbar-slot canvas {
+    image-rendering: pixelated;
+    width: 34px;
+    height: 34px;
+}
+
+.slot-num {
+    position: absolute;
+    bottom: 1px;
+    right: 3px;
+    font-family: Consolas, monospace;
+    font-size: 11px;
+    font-weight: bold;
+    color: #ffff55;
+    text-shadow: 1px 1px 1px #000;
+    pointer-events: none;
+}
+
+/* Pause & Start Menu Overlay */
+#pause-menu {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(3px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    cursor: default;
+}
+
+.menu-box {
+    background: #252525;
+    border: 3px solid #5a5a5a;
+    border-radius: 6px;
+    padding: 24px 32px;
+    width: 420px;
+    max-width: 90vw;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
+}
+
+.menu-title {
+    font-family: 'Trebuchet MS', 'Arial Black', sans-serif;
+    font-size: 32px;
+    font-weight: 900;
+    color: #e0e0e0;
+    text-shadow: 3px 3px 0 #3b3b3b, 5px 5px 0 #000;
+    margin-bottom: 8px;
+    letter-spacing: 2px;
+}
+
+.menu-subtitle {
+    font-size: 13px;
+    color: #aaa;
+    margin-bottom: 20px;
+}
+
+.menu-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.mc-btn {
+    background: #6a6a6a;
+    color: #ffffff;
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    font-size: 15px;
+    font-weight: bold;
+    padding: 10px 16px;
+    border: 2px solid #000;
+    border-top-color: #8f8f8f;
+    border-left-color: #8f8f8f;
+    border-right-color: #3b3b3b;
+    border-bottom-color: #3b3b3b;
+    cursor: pointer;
+    text-shadow: 1px 1px 1px #000;
+    transition: background 0.1s;
+}
+
+.mc-btn:hover {
+    background: #7e7e7e;
+    border-top-color: #a0a0a0;
+    border-left-color: #a0a0a0;
+}
+
+.mc-btn:active {
+    border-top-color: #3b3b3b;
+    border-left-color: #3b3b3b;
+    border-right-color: #8f8f8f;
+    border-bottom-color: #8f8f8f;
+}
+
+.mc-btn.primary {
+    background: #3e7b3e;
+    border-top-color: #5ea45e;
+    border-left-color: #5ea45e;
+    border-right-color: #1e451e;
+    border-bottom-color: #1e451e;
+}
+
+.mc-btn.primary:hover {
+    background: #4a914a;
+}
+
+.controls-card {
+    text-align: left;
+    background: #191919;
+    padding: 12px 16px;
+    border-radius: 4px;
+    font-size: 12px;
+    color: #bbb;
+    line-height: 1.6;
+    border: 1px solid #333;
+}
+
+.controls-card strong {
+    color: #fff;
+}
+
+.key-badge {
+    background: #333;
+    border: 1px solid #555;
+    border-radius: 3px;
+    padding: 1px 5px;
+    font-family: monospace;
+    color: #ffff88;
+    font-size: 11px;
+}

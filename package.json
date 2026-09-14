@@ -1,0 +1,19 @@
+{
+  "name": "minecraftlite",
+  "version": "1.0.0",
+  "description": "3D Procedural Voxel Minecraft Clone in WebGL / Three.js",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "keywords": [
+    "minecraft",
+    "voxel",
+    "threejs",
+    "webgl",
+    "game"
+  ],
+  "author": "Antigravity",
+  "license": "MIT"
+}
