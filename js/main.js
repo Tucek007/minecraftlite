@@ -43,7 +43,8 @@
         atlasTexture.minFilter = THREE.NearestFilter;
 
         // 4. World setup
-        const savedSeed = parseInt(localStorage.getItem('minecraftlite_seed'), 10) || Math.floor(Math.random() * 100000);
+        const storedSeed = parseInt(localStorage.getItem('minecraftlite_seed'), 10);
+        const savedSeed = Number.isFinite(storedSeed) ? storedSeed : Math.floor(Math.random() * 100000);
         world = new window.World.VoxelWorld(savedSeed);
 
         // Try restoring saved world modifications
@@ -55,21 +56,7 @@
         // 5. Player controller
         player = new window.PlayerController(camera, renderer.domElement, world, audio);
 
-        // Find safe spawn altitude
-        const spawnX = 8.5;
-        const spawnZ = 8.5;
-        let groundY = 25;
-        // Pre-load spawn chunk to find surface
-        world.getOrCreateChunk(0, 0);
-        for (let y = window.World.CHUNK_HEIGHT - 1; y >= 0; y--) {
-            if (world.isSolid(Math.floor(spawnX), y, Math.floor(spawnZ))) {
-                groundY = y + 1;
-                break;
-            }
-        }
-        player.position.x = spawnX;
-        player.position.y = groundY + 1.0;
-        player.position.z = spawnZ;
+        window.WorldSession.resetPlayer(player, world);
 
         // 6. UI Manager
         window.UI.init(player, world, atlasCanvas);
@@ -84,7 +71,7 @@
         setupGameInput();
 
         // 10. Initial Chunk Generation
-        loadSurroundingChunks(true);
+        loadSurroundingChunks();
 
         // 11. Window Resize
         window.addEventListener('resize', onWindowResize);
@@ -141,6 +128,20 @@
         scene.add(blockOutline);
     }
 
+    function changeWorld(nextWorld) {
+        window.WorldSession.replaceWorld(world, nextWorld, player, window.UI);
+        world = nextWorld;
+        for (const particle of particles) {
+            scene.remove(particle.mesh);
+            particle.mesh.geometry.dispose();
+            particle.mesh.material.dispose();
+        }
+        particles = [];
+        blockOutline.visible = false;
+        dayTime = 0.25;
+        loadSurroundingChunks();
+    }
+
     function setupGameInput() {
         const blocker = document.getElementById('pause-menu');
         const resumeBtn = document.getElementById('btn-resume');
@@ -186,21 +187,12 @@
             loadBtn.addEventListener('click', () => {
                 const json = localStorage.getItem('minecraftlite_world');
                 if (json) {
-                    // Remove current chunk meshes and free GPU memory
-                    for (const chunk of world.chunks.values()) {
-                        if (chunk.mesh) {
-                            scene.remove(chunk.mesh);
-                            if (chunk.mesh.geometry) chunk.mesh.geometry.dispose();
-                            if (chunk.mesh.material) chunk.mesh.material.dispose();
-                        }
-                        if (chunk.waterMesh) {
-                            scene.remove(chunk.waterMesh);
-                            if (chunk.waterMesh.geometry) chunk.waterMesh.geometry.dispose();
-                            if (chunk.waterMesh.material) chunk.waterMesh.material.dispose();
-                        }
+                    const restoredWorld = new window.World.VoxelWorld(world.seed);
+                    if (!restoredWorld.loadFromJSON(json)) {
+                        window.UI.showToast('Could not load saved world.');
+                        return;
                     }
-                    world.loadFromJSON(json);
-                    loadSurroundingChunks(true);
+                    changeWorld(restoredWorld);
                     window.UI.showToast('World Loaded Successfully!');
                 } else {
                     window.UI.showToast('No saved world found.');
@@ -215,22 +207,7 @@
                     const newSeed = Math.floor(Math.random() * 100000);
                     localStorage.setItem('minecraftlite_seed', newSeed);
 
-                    for (const chunk of world.chunks.values()) {
-                        if (chunk.mesh) {
-                            scene.remove(chunk.mesh);
-                            if (chunk.mesh.geometry) chunk.mesh.geometry.dispose();
-                            if (chunk.mesh.material) chunk.mesh.material.dispose();
-                        }
-                        if (chunk.waterMesh) {
-                            scene.remove(chunk.waterMesh);
-                            if (chunk.waterMesh.geometry) chunk.waterMesh.geometry.dispose();
-                            if (chunk.waterMesh.material) chunk.waterMesh.material.dispose();
-                        }
-                    }
-                    world = new window.World.VoxelWorld(newSeed);
-                    player.world = world;
-                    player.position.y = 35;
-                    loadSurroundingChunks(true);
+                    changeWorld(new window.World.VoxelWorld(newSeed));
                     window.UI.showToast('Generated New World!');
                     lockPointer();
                 }
@@ -366,7 +343,7 @@
         }
     }
 
-    function loadSurroundingChunks(forceSync = false) {
+    function loadSurroundingChunks() {
         const pCx = Math.floor(player.position.x / window.World.CHUNK_SIZE_X);
         const pCz = Math.floor(player.position.z / window.World.CHUNK_SIZE_Z);
 
@@ -380,6 +357,8 @@
                 }
             }
         }
+        // Keep one extra ring for face culling and boundary collisions.
+        window.WorldSession.unloadFarChunks(world, pCx, pCz, RENDER_RADIUS + 1);
     }
 
     function updateDayNightCycle(dt) {

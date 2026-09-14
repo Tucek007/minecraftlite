@@ -143,7 +143,8 @@
         }
 
         isWater(x, y, z) {
-            const blockId = this.getBlock(x, y, z);
+            // Resolve fractional player coordinates to the containing block; floor also handles negatives.
+            const blockId = this.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
             return (Blocks && Blocks.BLOCKS) ? (blockId === Blocks.BLOCKS.WATER) : (blockId === 11);
         }
 
@@ -274,7 +275,15 @@
                     for (let ox = -radius; ox <= radius; ox++) {
                         for (let oz = -radius; oz <= radius; oz++) {
                             if (ox === 0 && oz === 0 && dy < 0) continue; // trunk inside
-                            if (Math.abs(ox) === radius && Math.abs(oz) === radius && (dy === 1 || Math.random() > 0.5)) continue;
+                            // Hash world coordinates so foliage is independent of generation order.
+                            const leafHash = Math.sin(
+                                this.seed * 12.9898 +
+                                (t.lx + ox + chunk.chunkX * CHUNK_SIZE_X) * 78.233 +
+                                (t.lz + oz + chunk.chunkZ * CHUNK_SIZE_Z) * 37.719 +
+                                (leafTop + dy) * 43.7585
+                            ) * 43758.5453;
+                            const leafRand = leafHash - Math.floor(leafHash);
+                            if (Math.abs(ox) === radius && Math.abs(oz) === radius && (dy === 1 || leafRand > 0.5)) continue;
 
                             const fx = t.lx + ox;
                             const fy = leafTop + dy;
@@ -482,6 +491,7 @@
             } else if (chunk.mesh) {
                 if (chunk.mesh.parent) chunk.mesh.parent.remove(chunk.mesh);
                 chunk.mesh.geometry.dispose();
+                if (chunk.mesh.material && typeof chunk.mesh.material.dispose === 'function') chunk.mesh.material.dispose();
                 chunk.mesh = null;
             }
 
@@ -509,6 +519,7 @@
             } else if (chunk.waterMesh) {
                 if (chunk.waterMesh.parent) chunk.waterMesh.parent.remove(chunk.waterMesh);
                 chunk.waterMesh.geometry.dispose();
+                if (chunk.waterMesh.material && typeof chunk.waterMesh.material.dispose === 'function') chunk.waterMesh.material.dispose();
                 chunk.waterMesh = null;
             }
 
@@ -526,7 +537,7 @@
         loadFromJSON(jsonString) {
             try {
                 const data = JSON.parse(jsonString);
-                this.seed = data.seed || this.seed;
+                this.seed = data.seed ?? this.seed;
                 this.noise = new PerlinNoise(this.seed);
                 this.biomeNoise = new PerlinNoise(this.seed + 1013);
                 this.caveNoise = new PerlinNoise(this.seed + 2039);

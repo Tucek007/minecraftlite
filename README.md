@@ -84,7 +84,7 @@ Otevřete prohlížeč na adrese: **[http://localhost:8080/](http://localhost:80
 
 ## 🧪 Automatizované testy
 
-Projekt obsahuje sadu 20 jednotkových testů běžících přímo v Node.js:
+Projekt obsahuje jednotkové a integrační testy běžící přímo v Node.js:
 
 ```bash
 npm test
@@ -95,3 +95,12 @@ Testované oblasti:
 - Správnost registru bloků a UV souřadnic v texturovém atlasu.
 - Detekce AABB kolizí a raycasting algoritmus.
 - Práce se souřadnicemi chunků, generování na vyžádání a serializace stavu světa.
+
+Testy se spouštějí také automaticky na GitHubu při pushi a pull requestu (Node.js 22).
+
+### Správa světa
+
+- Okolí hráče se průběžně načítá; vzdálené chunky se uvolňují z paměti včetně jejich geometrie a materiálů. Úpravy bloků se zachovají i po návratu.
+- Start, načtení a nový svět používají společné bezpečné umístění hráče nad terénem nebo vodou.
+- Generování korun stromů je odvozené od seedu a souřadnic. Ve starších uložených světech se může jednorázově změnit původně náhodný tvar listí; uložené úpravy bloků se použijí i nadále.
+- Pozice hráče se zatím do uloženého světa neukládá.

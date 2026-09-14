@@ -58,6 +58,39 @@ describe('World and Chunk tests', () => {
         assert.strictEqual(newWorld.getBlock(10, 26, 10), Blocks.BLOCKS.GOLD_ORE);
     });
 
+    test('isWater resolves fractional and negative world coordinates', () => {
+        const world = new World.VoxelWorld(42);
+        world.setBlock(-17, 10, -1, Blocks.BLOCKS.WATER);
+
+        assert.strictEqual(world.isWater(-16.9, 10.9, -0.1), true,
+            'A fractional position inside a negative water block should be detected');
+        assert.strictEqual(world.isWater(-16.0, 10.9, -0.1), false,
+            'The next block boundary should not be treated as the previous water block');
+    });
+
+    test('same seed generates identical chunks regardless of generation order', () => {
+        const coordinates = [[0, 0], [1, 0], [-1, -1], [2, -2]];
+        const first = new World.VoxelWorld(777);
+        const second = new World.VoxelWorld(777);
+
+        for (const [cx, cz] of coordinates) first.getOrCreateChunk(cx, cz);
+        for (const [cx, cz] of coordinates.slice().reverse()) second.getOrCreateChunk(cx, cz);
+
+        for (const [cx, cz] of coordinates) {
+            assert.deepStrictEqual(
+                Array.from(first.getChunk(cx, cz).voxels),
+                Array.from(second.getChunk(cx, cz).voxels),
+                `Chunk ${cx},${cz} should be deterministic for a given seed`
+            );
+        }
+    });
+    test('loadFromJSON preserves a zero seed', () => {
+        const world = new World.VoxelWorld(123);
+        const saved = new World.VoxelWorld(0).saveToJSON();
+
+        assert.strictEqual(world.loadFromJSON(saved), true);
+        assert.strictEqual(world.seed, 0);
+    });
     test('Biome distribution returns expected types', () => {
         const world = new World.VoxelWorld(1234);
         const validBiomes = new Set(['plains', 'forest', 'desert', 'mountains']);
