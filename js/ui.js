@@ -17,6 +17,7 @@
         constructor() {
             this.debugVisible = false;
             this.isInventoryOpen = false;
+            this.hoveredBlockId = null;
             this.toastTimer = null;
             this.fpsHistory = [];
             this.lastFrameTime = performance.now();
@@ -68,10 +69,15 @@
                     }
                     if (e.code.startsWith('Digit') && e.code.length === 6) {
                         const num = parseInt(e.code[5], 10);
-                        if (num >= 1 && num <= 9 && document.querySelector) {
-                            const hovered = document.querySelector('.inventory-slot:hover');
-                            if (hovered && hovered.dataset && hovered.dataset.blockId) {
-                                const blockId = parseInt(hovered.dataset.blockId, 10);
+                        if (num >= 1 && num <= 9) {
+                            let blockId = this.hoveredBlockId;
+                            if (!blockId && typeof document !== 'undefined' && document.querySelector) {
+                                const hovered = document.querySelector('.inventory-slot:hover');
+                                if (hovered && hovered.dataset && hovered.dataset.blockId) {
+                                    blockId = parseInt(hovered.dataset.blockId, 10);
+                                }
+                            }
+                            if (blockId) {
                                 this.setHotbarBlock(num - 1, blockId);
                                 const bDef = Blocks && Blocks.BLOCK_DEFS && Blocks.BLOCK_DEFS[blockId];
                                 this.showToast(`${bDef ? bDef.name : 'Block'} assigned to slot ${num}`);
@@ -103,7 +109,7 @@
                 if (ictx) {
                     ictx.imageSmoothingEnabled = false;
 
-                    const tileIdx = Blocks.getBlockFaceTexture(blockId, 2); // top face
+                    const tileIdx = Blocks.getBlockFaceTexture(blockId, 0); // side face (displays distinctive textures for Bookshelf, TNT, Wood, etc.)
                     const tx = (tileIdx % 16) * 16;
                     const ty = Math.floor(tileIdx / 16) * 16;
 
@@ -148,7 +154,7 @@
                 const ictx = iconCanvas.getContext('2d');
                 if (ictx) {
                     ictx.imageSmoothingEnabled = false;
-                    const tileIdx = Blocks.getBlockFaceTexture(blockId, 2);
+                    const tileIdx = Blocks.getBlockFaceTexture(blockId, 0); // side face (displays distinctive textures for Bookshelf, TNT, Wood, etc.)
                     const tx = (tileIdx % 16) * 16;
                     const ty = Math.floor(tileIdx / 16) * 16;
                     ictx.drawImage(this.atlasCanvas, tx, ty, 16, 16, 0, 0, 36, 36);
@@ -160,6 +166,16 @@
 
                 slot.appendChild(iconCanvas);
                 slot.appendChild(label);
+
+                slot.addEventListener('mouseenter', () => {
+                    this.hoveredBlockId = blockId;
+                });
+
+                slot.addEventListener('mouseleave', () => {
+                    if (this.hoveredBlockId === blockId) {
+                        this.hoveredBlockId = null;
+                    }
+                });
 
                 slot.addEventListener('click', () => {
                     const targetSlot = this.player ? this.player.selectedSlot : 0;

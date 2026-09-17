@@ -27,6 +27,7 @@
             this.chunkZ = chunkZ;
             this.voxels = new Uint8Array(CHUNK_SIZE_X * CHUNK_HEIGHT * CHUNK_SIZE_Z);
             this.dirty = true;
+            this.hasModifications = false;
             this.mesh = null;
             this.waterMesh = null;
         }
@@ -121,6 +122,7 @@
             const lx = (x % CHUNK_SIZE_X + CHUNK_SIZE_X) % CHUNK_SIZE_X;
             const lz = (z % CHUNK_SIZE_Z + CHUNK_SIZE_Z) % CHUNK_SIZE_Z;
             const res = chunk.setBlock(lx, y, lz, blockId);
+            chunk.hasModifications = true;
 
             // Record modification for save/load
             this.modifiedBlocks.set(`${x},${y},${z}`, blockId);
@@ -274,7 +276,9 @@
 
             // Plant trees safely within chunk bounds
             for (const t of treesToPlant) {
-                const trunkHeight = 4 + Math.floor((Math.sin(t.lx * 7 + t.lz * 13) * 0.5 + 0.5) * 2);
+                const twx = chunk.chunkX * CHUNK_SIZE_X + t.lx;
+                const twz = chunk.chunkZ * CHUNK_SIZE_Z + t.lz;
+                const trunkHeight = 4 + Math.floor((Math.sin(this.seed * 1.7 + twx * 7.3 + twz * 13.1) * 0.5 + 0.5) * 2);
 
                 // Trunk
                 for (let ty = 0; ty < trunkHeight; ty++) {
@@ -326,6 +330,7 @@
                     const lx = (mx % CHUNK_SIZE_X + CHUNK_SIZE_X) % CHUNK_SIZE_X;
                     const lz = (mz % CHUNK_SIZE_Z + CHUNK_SIZE_Z) % CHUNK_SIZE_Z;
                     chunk.setBlock(lx, my, lz, blockId);
+                    chunk.hasModifications = true;
                 }
             }
 

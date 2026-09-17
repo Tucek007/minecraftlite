@@ -187,7 +187,7 @@
                 this.world.isWater(this.position.x, this.position.y + 0.6, this.position.z) :
                 (typeof this.world.getBlock === 'function' && this.world.getBlock(Math.floor(this.position.x), Math.floor(this.position.y + 0.6), Math.floor(this.position.z)) === 11));
 
-            if (inWater && !this.wasInWater && this.audio && !this.isFlying) {
+            if (inWater && !this.wasInWater && this.audio && typeof this.audio.playSplash === 'function' && !this.isFlying) {
                 this.audio.playSplash();
             }
             this.wasInWater = inWater;
@@ -241,7 +241,7 @@
                 if (this.keys['Space'] && this.onGround) {
                     this.velocity.y = 8.6; // Jump impulse (~1.25 blocks height)
                     this.onGround = false;
-                    if (this.audio) this.audio.playJump();
+                    if (this.audio && typeof this.audio.playJump === 'function') this.audio.playJump();
                 }
             }
 
@@ -258,9 +258,7 @@
                     this.fallDistance += Math.abs(displacement.y);
                 }
             } else {
-                if (this.isFlying || inWater) {
-                    this.fallDistance = 0;
-                }
+                this.fallDistance = 0;
             }
 
             const wasGroundedBefore = this.onGround;
@@ -304,14 +302,19 @@
 
             // Void recovery
             if (this.position.y < -10) {
-                this.position.y = 45;
-                this.position.x = 8.5;
-                this.position.z = 8.5;
+                const spawn = this.getSafeSpawnPosition(8.5, 8.5);
+                this.position.x = spawn.x;
+                this.position.y = spawn.y;
+                this.position.z = spawn.z;
                 this.velocity.x = 0;
                 this.velocity.y = 0;
                 this.velocity.z = 0;
+                this.fallDistance = 0;
+                this.onGround = true;
                 const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
-                if (UI) UI.showToast('Respawned above surface!');
+                if (UI && typeof UI.showToast === 'function') {
+                    UI.showToast('Respawned above surface!');
+                }
             }
 
             // Footstep audio and head bobbing
@@ -324,7 +327,7 @@
                 this.stepDistance += hDist;
                 if (this.stepDistance >= 1.8) {
                     this.stepDistance = 0;
-                    if (this.audio && this.world) {
+                    if (this.audio && typeof this.audio.playStep === 'function' && this.world) {
                         const underBlock = this.world.getBlock(
                             Math.floor(this.position.x),
                             Math.floor(this.position.y - 0.2),
@@ -431,15 +434,36 @@
             this.respawn();
         }
 
+        getSafeSpawnPosition(spawnX = 8.5, spawnZ = 8.5) {
+            let groundY = 25;
+            if (this.world) {
+                if (typeof this.world.getOrCreateChunk === 'function') {
+                    const cx = Math.floor(spawnX / 16);
+                    const cz = Math.floor(spawnZ / 16);
+                    this.world.getOrCreateChunk(cx, cz);
+                }
+                const maxHeight = (typeof window !== 'undefined' && window.World && window.World.CHUNK_HEIGHT) ? window.World.CHUNK_HEIGHT : 64;
+                for (let y = maxHeight - 1; y >= 0; y--) {
+                    if (this.world.isSolid(Math.floor(spawnX), y, Math.floor(spawnZ))) {
+                        groundY = y + 1;
+                        break;
+                    }
+                }
+            }
+            return { x: spawnX, y: groundY + 0.1, z: spawnZ };
+        }
+
         respawn() {
             this.health = this.maxHealth;
-            this.position.x = 8.5;
-            this.position.y = 35.0;
-            this.position.z = 8.5;
+            const spawn = this.getSafeSpawnPosition(8.5, 8.5);
+            this.position.x = spawn.x;
+            this.position.y = spawn.y;
+            this.position.z = spawn.z;
             this.velocity.x = 0;
             this.velocity.y = 0;
             this.velocity.z = 0;
             this.fallDistance = 0;
+            this.onGround = true;
             const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
             if (UI && typeof UI.updateHealth === 'function') {
                 UI.updateHealth(this.health);

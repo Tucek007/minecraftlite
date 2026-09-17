@@ -10,6 +10,7 @@
     let blockOutline;
     let particles = [];
     let activeTNTs = [];
+    let debrisMaterial = null;
     let clock;
     let isPaused = true;
 
@@ -51,6 +52,11 @@
         atlasTexture.magFilter = THREE.NearestFilter;
         atlasTexture.minFilter = THREE.NearestFilter;
 
+        debrisMaterial = new THREE.MeshBasicMaterial({
+            map: atlasTexture,
+            color: 0xffffff
+        });
+
         // 4. World setup (preserve seed 0 strictly)
         const storedSeed = localStorage.getItem('minecraftlite_seed');
         let initialSeed;
@@ -73,20 +79,12 @@
         // Try restoring saved player state, otherwise spawn safely
         const restoredPlayer = loadPlayerState();
         if (!restoredPlayer) {
-            const spawnX = 8.5;
-            const spawnZ = 8.5;
-            let groundY = 25;
-            // Pre-load spawn chunk to find surface
-            world.getOrCreateChunk(0, 0);
-            for (let y = window.World.CHUNK_HEIGHT - 1; y >= 0; y--) {
-                if (world.isSolid(Math.floor(spawnX), y, Math.floor(spawnZ))) {
-                    groundY = y + 1;
-                    break;
-                }
-            }
-            player.position.x = spawnX;
-            player.position.y = groundY + 1.0;
-            player.position.z = spawnZ;
+            const spawn = player.getSafeSpawnPosition(8.5, 8.5);
+            player.position.x = spawn.x;
+            player.position.y = spawn.y;
+            player.position.z = spawn.z;
+            player.fallDistance = 0;
+            player.onGround = true;
         }
 
         // 6. UI Manager
@@ -111,7 +109,7 @@
         requestAnimationFrame(animate);
     }
 
-    function saveGameState() {
+    function saveGameState(silent = false) {
         // 1. Save world voxels & seed
         const json = world.saveToJSON();
         localStorage.setItem('minecraftlite_world', json);
@@ -129,7 +127,7 @@
             isFlying: player.isFlying
         };
         localStorage.setItem('minecraftlite_player', JSON.stringify(playerData));
-        if (window.UI) window.UI.showToast('World & Player Saved!');
+        if (!silent && window.UI) window.UI.showToast('World & Player Saved!');
     }
 
     function loadPlayerState() {
@@ -148,6 +146,7 @@
             if (typeof data.pitch === 'number') player.pitch = data.pitch;
             if (typeof data.selectedSlot === 'number' && data.selectedSlot >= 0 && data.selectedSlot < 9) {
                 player.selectedSlot = data.selectedSlot;
+                if (window.UI) window.UI.updateActiveSlot(player.selectedSlot);
             }
             if (Array.isArray(data.hotbarBlocks) && data.hotbarBlocks.length === 9 && window.UI) {
                 window.UI.hotbarBlocks = data.hotbarBlocks.slice();
@@ -248,6 +247,17 @@
             }
         });
 
+        document.addEventListener('pointerlockerror', () => {
+            isPaused = true;
+            if (blocker && (!window.UI || !window.UI.isInventoryOpen)) {
+                blocker.style.display = 'flex';
+            }
+        });
+
+        window.addEventListener('beforeunload', () => {
+            saveGameState(true);
+        });
+
         if (resumeBtn) {
             resumeBtn.addEventListener('click', () => lockPointer());
         }
@@ -266,10 +276,30 @@
             });
         }
 
+        function clearActiveEntities() {
+            for (const tnt of activeTNTs) {
+                scene.remove(tnt.mesh);
+                if (tnt.mesh.geometry) tnt.mesh.geometry.dispose();
+                if (tnt.mesh.material) tnt.mesh.material.dispose();
+            }
+            activeTNTs = [];
+
+            for (const p of particles) {
+                scene.remove(p.mesh);
+                if (p.mesh.geometry) p.mesh.geometry.dispose();
+                if (p.mesh.material && p.mesh.material !== debrisMaterial) {
+                    p.mesh.material.dispose();
+                }
+            }
+            particles = [];
+        }
+
         if (loadBtn) {
             loadBtn.addEventListener('click', () => {
                 const json = localStorage.getItem('minecraftlite_world');
                 if (json) {
+                    clearActiveEntities();
+
                     // Remove current chunk meshes and free GPU geometry
                     for (const chunk of world.chunks.values()) {
                         if (chunk.mesh) {
@@ -305,6 +335,8 @@
                     const newSeed = Math.floor(Math.random() * 100000);
                     localStorage.setItem('minecraftlite_seed', String(newSeed));
 
+                    clearActiveEntities();
+
                     for (const chunk of world.chunks.values()) {
                         if (chunk.mesh) {
                             scene.remove(chunk.mesh);
@@ -329,12 +361,16 @@
                         window.UI.updateHealth(20);
                     }
                     player.health = 20;
-                    player.position.x = 8.5;
-                    player.position.y = 35;
-                    player.position.z = 8.5;
+                    const spawn = player.getSafeSpawnPosition(8.5, 8.5);
+                    player.position.x = spawn.x;
+                    player.position.y = spawn.y;
+                    player.position.z = spawn.z;
                     player.velocity.x = 0;
                     player.velocity.y = 0;
                     player.velocity.z = 0;
+                    player.fallDistance = 0;
+                    player.onGround = true;
+                    dayTime = 0.25;
                     loadSurroundingChunks(true);
                     window.UI.showToast('Generated New World!');
                     lockPointer();
@@ -410,6 +446,8 @@
         // Right-clicking TNT ignites it!
         if (hitBlockId === window.Blocks.BLOCKS.TNT) {
             igniteTNT(hitPos.x, hitPos.y, hitPos.z);
+            isMouseDown = false;
+            activeMouseButton = -1;
             return;
         }
 
@@ -440,7 +478,7 @@
         bz = Math.floor(bz);
 
         const currentBlock = world.getBlock(bx, by, bz);
-        if (currentBlock === window.Blocks.BLOCKS.AIR) return;
+        if (currentBlock !== window.Blocks.BLOCKS.TNT) return;
 
         world.setBlock(bx, by, bz, window.Blocks.BLOCKS.AIR);
         updateAffectedChunks(bx, bz);
@@ -645,7 +683,7 @@
     function spawnDebris(x, y, z, blockId) {
         const count = 8;
         const bDef = window.Blocks.BLOCK_DEFS[blockId];
-        const tileIdx = bDef ? window.Blocks.getBlockFaceTexture(blockId, 2) : 1;
+        const tileIdx = bDef ? window.Blocks.getBlockFaceTexture(blockId, 0) : 1;
         const { u0, v0, u1, v1 } = window.Blocks.getTileUV(tileIdx);
 
         for (let i = 0; i < count; i++) {
@@ -663,7 +701,7 @@
                 uvAttr.needsUpdate = true;
             }
 
-            const mat = new THREE.MeshBasicMaterial({
+            const mat = debrisMaterial || new THREE.MeshBasicMaterial({
                 map: atlasTexture,
                 color: 0xffffff
             });
@@ -715,19 +753,25 @@
         const pCx = Math.floor(player.position.x / window.World.CHUNK_SIZE_X);
         const pCz = Math.floor(player.position.z / window.World.CHUNK_SIZE_Z);
 
-        // 1. Load / mesh chunks within LOAD_RADIUS
+        // 1. First ensure all chunks in radius exist in memory
+        const chunksToMesh = [];
         for (let rx = -LOAD_RADIUS; rx <= LOAD_RADIUS; rx++) {
             for (let rz = -LOAD_RADIUS; rz <= LOAD_RADIUS; rz++) {
                 const cx = pCx + rx;
                 const cz = pCz + rz;
                 const chunk = world.getOrCreateChunk(cx, cz);
                 if (chunk.dirty) {
-                    rebuildChunkMesh(chunk);
+                    chunksToMesh.push(chunk);
                 }
             }
         }
 
-        // 2. Unload distant chunks beyond UNLOAD_RADIUS (hysteresis prevents thrashing)
+        // 2. Mesh any dirty chunks (all neighbors are now in memory, eliminating seam faces)
+        for (const chunk of chunksToMesh) {
+            rebuildChunkMesh(chunk);
+        }
+
+        // 3. Unload distant chunks beyond UNLOAD_RADIUS (hysteresis prevents thrashing)
         for (const [key, chunk] of world.chunks.entries()) {
             const dist = Math.max(Math.abs(chunk.chunkX - pCx), Math.abs(chunk.chunkZ - pCz));
             if (dist > UNLOAD_RADIUS) {
@@ -742,17 +786,7 @@
                     chunk.waterMesh = null;
                 }
 
-                // Check if chunk has modifications
-                let hasModifications = false;
-                for (const mKey of world.modifiedBlocks.keys()) {
-                    const [mx, , mz] = mKey.split(',').map(Number);
-                    if (Math.floor(mx / window.World.CHUNK_SIZE_X) === chunk.chunkX &&
-                        Math.floor(mz / window.World.CHUNK_SIZE_Z) === chunk.chunkZ) {
-                        hasModifications = true;
-                        break;
-                    }
-                }
-                if (!hasModifications) {
+                if (!chunk.hasModifications) {
                     world.chunks.delete(key);
                 } else {
                     chunk.dirty = true;
@@ -840,7 +874,9 @@
             if (p.life <= 0) {
                 scene.remove(p.mesh);
                 p.mesh.geometry.dispose();
-                p.mesh.material.dispose();
+                if (p.mesh.material && p.mesh.material !== debrisMaterial) {
+                    p.mesh.material.dispose();
+                }
                 particles.splice(i, 1);
             }
         }
@@ -880,7 +916,7 @@
                         onBreakBlock();
                         mouseActionCooldown = BREAK_COOLDOWN;
                     } else if (activeMouseButton === 2) {
-                        onPlaceOrInteract();
+                        onPlaceBlock();
                         mouseActionCooldown = PLACE_COOLDOWN;
                     }
                 }

@@ -68,6 +68,14 @@ describe('Improvements & Roadmap Verification Tests', () => {
             const generatedBlock = world.getBlock(100, 20, 100, true);
             assert.strictEqual(world.chunks.size, 1, 'Standard query creates chunk');
         });
+
+        test('chunk.hasModifications tracks modified blocks', () => {
+            const world = new World.VoxelWorld(999);
+            const chunk = world.getOrCreateChunk(0, 0);
+            assert.strictEqual(chunk.hasModifications, false);
+            world.setBlock(2, 5, 2, Blocks.BLOCKS.GLASS);
+            assert.strictEqual(chunk.hasModifications, true);
+        });
     });
 
     describe('2. Performance & GPU Shared Materials', () => {
@@ -200,12 +208,31 @@ describe('Improvements & Roadmap Verification Tests', () => {
             assert.strictEqual(player.health, 20, 'Creative flying mode must be immune to damage');
         });
 
-        test('Fatal damage triggers death and respawn to max health', () => {
-            const { player } = createPlayerMock();
+        test('Fatal damage triggers death and respawn safely on surface without fall damage', () => {
+            const { player, getHurtPlayed } = createPlayerMock();
             player.takeDamage(25);
             assert.strictEqual(player.health, 20, 'Player health should reset to max health after respawn');
             assert.strictEqual(player.position.x, 8.5, 'Respawn should place player at spawn X');
             assert.strictEqual(player.position.z, 8.5, 'Respawn should place player at spawn Z');
+
+            // Simulate stepping after respawn
+            for (let i = 0; i < 60; i++) {
+                player.update(0.016);
+            }
+            assert.strictEqual(player.health, 20, 'Player must not take fall damage after respawning');
+            assert.strictEqual(player.onGround, true, 'Player should be safely grounded');
+        });
+
+        test('Void recovery spawns player safely on ground without death loop', () => {
+            const { player } = createPlayerMock();
+            player.position = { x: 8.5, y: -15.0, z: 8.5 };
+            player.update(0.016); // triggers void recovery
+
+            for (let i = 0; i < 60; i++) {
+                player.update(0.016);
+            }
+            assert.strictEqual(player.health, 20, 'Void recovery must not deal lethal fall damage');
+            assert.strictEqual(player.onGround, true, 'Player should be safely on ground after void recovery');
         });
     });
 
@@ -232,6 +259,15 @@ describe('Improvements & Roadmap Verification Tests', () => {
             const obsidian = Blocks.BLOCK_DEFS[Blocks.BLOCKS.OBSIDIAN];
             assert.strictEqual(bedrock.unbreakable, true);
             assert.strictEqual(obsidian.id, 17);
+        });
+
+        test('Bookshelf side texture represents books and differs from plain planks', () => {
+            const bookshelfTop = Blocks.getBlockFaceTexture(Blocks.BLOCKS.BOOKSHELF, 2);
+            const bookshelfSide = Blocks.getBlockFaceTexture(Blocks.BLOCKS.BOOKSHELF, 0);
+            const planks = Blocks.getBlockFaceTexture(Blocks.BLOCKS.PLANKS, 0);
+            assert.strictEqual(bookshelfTop, planks, 'Top face of bookshelf is planks');
+            assert.notStrictEqual(bookshelfSide, planks, 'Side face of bookshelf must differ from planks');
+            assert.strictEqual(bookshelfSide, Blocks.TILES.BOOKSHELF_SIDE, 'Side face is BOOKSHELF_SIDE');
         });
     });
 
@@ -333,6 +369,13 @@ describe('Improvements & Roadmap Verification Tests', () => {
             UI.closeInventory();
             assert.strictEqual(UI.isInventoryOpen, false);
             assert.strictEqual(locked, true, 'Closing inventory re-locks pointer');
+        });
+
+        test('UI Manager supports hoveredBlockId assignment to hotbar', () => {
+            const UI = require('../js/ui.js');
+            UI.hoveredBlockId = Blocks.BLOCKS.GOLD_ORE;
+            UI.setHotbarBlock(3, UI.hoveredBlockId);
+            assert.strictEqual(UI.hotbarBlocks[3], Blocks.BLOCKS.GOLD_ORE);
         });
     });
 });
