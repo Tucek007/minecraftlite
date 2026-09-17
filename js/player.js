@@ -40,6 +40,11 @@
             this.isFlying = false;
             this.isSprinting = false;
 
+            // Health and fall damage
+            this.maxHealth = 20;
+            this.health = 20;
+            this.fallDistance = 0;
+
             this.reachDistance = 5.5;
             this.targetBlock = null;
 
@@ -116,6 +121,14 @@
             if (e.code === 'F3') {
                 if (typeof e.preventDefault === 'function') e.preventDefault();
                 if (UI) UI.toggleDebug();
+            }
+
+            // Creative inventory overlay toggle: 'E'
+            if (e.code === 'KeyE') {
+                if (UI && typeof UI.toggleInventory === 'function') {
+                    if (typeof e.preventDefault === 'function') e.preventDefault();
+                    UI.toggleInventory();
+                }
             }
         }
 
@@ -239,6 +252,19 @@
                 z: this.velocity.z * delta
             };
 
+            // Fall distance tracking
+            if (!this.onGround && !this.isFlying && !inWater) {
+                if (this.velocity.y < 0) {
+                    this.fallDistance += Math.abs(displacement.y);
+                }
+            } else {
+                if (this.isFlying || inWater) {
+                    this.fallDistance = 0;
+                }
+            }
+
+            const wasGroundedBefore = this.onGround;
+
             const Phys = Physics || (g && g.Physics) || (typeof require !== 'undefined' ? require('./physics') : null);
             if (Phys && this.world) {
                 const result = Phys.moveWithCollision(
@@ -252,6 +278,18 @@
                 );
 
                 this.onGround = result.onGround;
+
+                // Check landing for fall damage
+                if (!wasGroundedBefore && this.onGround && !this.isFlying && !inWater) {
+                    if (this.fallDistance > 3.0) {
+                        const damage = Math.floor(this.fallDistance - 3.0);
+                        if (damage > 0) {
+                            this.takeDamage(damage);
+                        }
+                    }
+                    this.fallDistance = 0;
+                }
+
                 if (this.onGround && this.velocity.y < 0) {
                     this.velocity.y = 0;
                 }
@@ -368,6 +406,44 @@
                 pzMin < bz + 1 && pzMax > bz
             );
             return !collides;
+        }
+
+        takeDamage(amount) {
+            if (this.isFlying) return;
+            this.health = Math.max(0, this.health - amount);
+            if (this.audio && typeof this.audio.playHurt === 'function') {
+                this.audio.playHurt();
+            }
+            const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
+            if (UI && typeof UI.updateHealth === 'function') {
+                UI.updateHealth(this.health);
+            }
+            if (this.health <= 0) {
+                this.die();
+            }
+        }
+
+        die() {
+            const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
+            if (UI && typeof UI.showToast === 'function') {
+                UI.showToast('You died! Respawning...');
+            }
+            this.respawn();
+        }
+
+        respawn() {
+            this.health = this.maxHealth;
+            this.position.x = 8.5;
+            this.position.y = 35.0;
+            this.position.z = 8.5;
+            this.velocity.x = 0;
+            this.velocity.y = 0;
+            this.velocity.z = 0;
+            this.fallDistance = 0;
+            const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
+            if (UI && typeof UI.updateHealth === 'function') {
+                UI.updateHealth(this.health);
+            }
         }
     }
 

@@ -36,6 +36,9 @@
         }
 
         getBlock(lx, ly, lz) {
+            lx = Math.floor(lx);
+            ly = Math.floor(ly);
+            lz = Math.floor(lz);
             if (lx < 0 || lx >= CHUNK_SIZE_X || ly < 0 || ly >= CHUNK_HEIGHT || lz < 0 || lz >= CHUNK_SIZE_Z) {
                 return 0; // AIR
             }
@@ -43,6 +46,9 @@
         }
 
         setBlock(lx, ly, lz, blockId) {
+            lx = Math.floor(lx);
+            ly = Math.floor(ly);
+            lz = Math.floor(lz);
             if (lx < 0 || lx >= CHUNK_SIZE_X || ly < 0 || ly >= CHUNK_HEIGHT || lz < 0 || lz >= CHUNK_SIZE_Z) {
                 return false;
             }
@@ -60,6 +66,8 @@
             this.caveNoise = new PerlinNoise(seed + 2039);
             this.chunks = new Map();
             this.modifiedBlocks = new Map(); // key "x,y,z" => blockId for save/load persistence
+            this.sharedOpaqueMaterial = null;
+            this.sharedWaterMaterial = null;
         }
 
         getChunkKey(cx, cz) {
@@ -81,13 +89,17 @@
             return chunk;
         }
 
-        getBlock(x, y, z) {
+        getBlock(x, y, z, createIfMissing = true) {
+            x = Math.floor(x);
+            y = Math.floor(y);
+            z = Math.floor(z);
+
             if (y < 0) return (Blocks && Blocks.BLOCKS) ? Blocks.BLOCKS.BEDROCK : 14;
             if (y >= CHUNK_HEIGHT) return 0; // AIR
 
             const cx = Math.floor(x / CHUNK_SIZE_X);
             const cz = Math.floor(z / CHUNK_SIZE_Z);
-            const chunk = this.getOrCreateChunk(cx, cz);
+            const chunk = createIfMissing ? this.getOrCreateChunk(cx, cz) : this.getChunk(cx, cz);
             if (!chunk) return 0;
 
             const lx = (x % CHUNK_SIZE_X + CHUNK_SIZE_X) % CHUNK_SIZE_X;
@@ -96,6 +108,10 @@
         }
 
         setBlock(x, y, z, blockId) {
+            x = Math.floor(x);
+            y = Math.floor(y);
+            z = Math.floor(z);
+
             if (y < 0 || y >= CHUNK_HEIGHT) return false;
 
             const cx = Math.floor(x / CHUNK_SIZE_X);
@@ -274,11 +290,19 @@
                     for (let ox = -radius; ox <= radius; ox++) {
                         for (let oz = -radius; oz <= radius; oz++) {
                             if (ox === 0 && oz === 0 && dy < 0) continue; // trunk inside
-                            if (Math.abs(ox) === radius && Math.abs(oz) === radius && (dy === 1 || Math.random() > 0.5)) continue;
 
                             const fx = t.lx + ox;
                             const fy = leafTop + dy;
                             const fz = t.lz + oz;
+
+                            if (Math.abs(ox) === radius && Math.abs(oz) === radius) {
+                                if (dy === 1) continue;
+                                const wfx = chunk.chunkX * CHUNK_SIZE_X + fx;
+                                const wfz = chunk.chunkZ * CHUNK_SIZE_Z + fz;
+                                const leafHash = Math.sin(this.seed * 11.13 + wfx * 12.9898 + fy * 78.233 + wfz * 37.719) * 43758.5453;
+                                const leafRand = leafHash - Math.floor(leafHash);
+                                if (leafRand > 0.5) continue;
+                            }
 
                             if (fx >= 0 && fx < CHUNK_SIZE_X && fz >= 0 && fz < CHUNK_SIZE_Z && fy < CHUNK_HEIGHT) {
                                 if (chunk.getBlock(fx, fy, fz) === B.AIR) {
@@ -342,15 +366,15 @@
 
                         const wz = czWorld + lz;
 
-                        // Check 6 adjacent neighbors
+                        // Check 6 adjacent neighbors (pass false to avoid cascading chunk creation)
                         // 0: +X, 1: -X, 2: +Y, 3: -Y, 4: +Z, 5: -Z
                         const neighbors = [
-                            this.getBlock(wx + 1, ly, wz),
-                            this.getBlock(wx - 1, ly, wz),
-                            this.getBlock(wx, ly + 1, wz),
-                            this.getBlock(wx, ly - 1, wz),
-                            this.getBlock(wx, ly, wz + 1),
-                            this.getBlock(wx, ly, wz - 1)
+                            this.getBlock(wx + 1, ly, wz, false),
+                            this.getBlock(wx - 1, ly, wz, false),
+                            this.getBlock(wx, ly + 1, wz, false),
+                            this.getBlock(wx, ly - 1, wz, false),
+                            this.getBlock(wx, ly, wz + 1, false),
+                            this.getBlock(wx, ly, wz - 1, false)
                         ];
 
                         for (let f = 0; f < 6; f++) {
@@ -467,14 +491,17 @@
                 geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
                 geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
 
-                if (!chunk.mesh) {
-                    const material = new THREE.MeshLambertMaterial({
+                if (!this.sharedOpaqueMaterial) {
+                    this.sharedOpaqueMaterial = new THREE.MeshLambertMaterial({
                         map: atlasTexture,
                         vertexColors: true,
                         transparent: false,
                         alphaTest: 0.2
                     });
-                    chunk.mesh = new THREE.Mesh(geometry, material);
+                }
+
+                if (!chunk.mesh) {
+                    chunk.mesh = new THREE.Mesh(geometry, this.sharedOpaqueMaterial);
                 } else {
                     chunk.mesh.geometry.dispose();
                     chunk.mesh.geometry = geometry;
@@ -493,15 +520,18 @@
                 waterGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(waterUvs, 2));
                 waterGeometry.setAttribute('color', new THREE.Float32BufferAttribute(waterColors, 3));
 
-                if (!chunk.waterMesh) {
-                    const waterMaterial = new THREE.MeshLambertMaterial({
+                if (!this.sharedWaterMaterial) {
+                    this.sharedWaterMaterial = new THREE.MeshLambertMaterial({
                         map: atlasTexture,
                         vertexColors: true,
                         transparent: true,
                         opacity: 0.65,
                         depthWrite: false
                     });
-                    chunk.waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
+                }
+
+                if (!chunk.waterMesh) {
+                    chunk.waterMesh = new THREE.Mesh(waterGeometry, this.sharedWaterMaterial);
                 } else {
                     chunk.waterMesh.geometry.dispose();
                     chunk.waterMesh.geometry = waterGeometry;
@@ -515,6 +545,17 @@
             chunk.dirty = false;
         }
 
+        disposeMaterials() {
+            if (this.sharedOpaqueMaterial) {
+                this.sharedOpaqueMaterial.dispose();
+                this.sharedOpaqueMaterial = null;
+            }
+            if (this.sharedWaterMaterial) {
+                this.sharedWaterMaterial.dispose();
+                this.sharedWaterMaterial = null;
+            }
+        }
+
         saveToJSON() {
             const data = {
                 seed: this.seed,
@@ -526,7 +567,9 @@
         loadFromJSON(jsonString) {
             try {
                 const data = JSON.parse(jsonString);
-                this.seed = data.seed || this.seed;
+                if (data.seed !== undefined && data.seed !== null && !isNaN(Number(data.seed))) {
+                    this.seed = Number(data.seed);
+                }
                 this.noise = new PerlinNoise(this.seed);
                 this.biomeNoise = new PerlinNoise(this.seed + 1013);
                 this.caveNoise = new PerlinNoise(this.seed + 2039);

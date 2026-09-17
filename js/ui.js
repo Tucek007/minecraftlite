@@ -16,6 +16,7 @@
     class UIManager {
         constructor() {
             this.debugVisible = false;
+            this.isInventoryOpen = false;
             this.toastTimer = null;
             this.fpsHistory = [];
             this.lastFrameTime = performance.now();
@@ -38,13 +39,47 @@
             this.world = world;
             this.atlasCanvas = atlasCanvas;
 
+            if (typeof document === 'undefined') return;
+
             this.hotbarEl = document.getElementById('hotbar');
             this.debugEl = document.getElementById('debug-info');
             this.toastEl = document.getElementById('toast');
             this.blockPromptEl = document.getElementById('block-prompt');
+            this.inventoryOverlayEl = document.getElementById('inventory-overlay');
+            this.heartsBarEl = document.getElementById('hearts-bar');
 
             this.buildHotbar();
+            this.buildInventoryGrid();
             this.updateActiveSlot(player.selectedSlot);
+            this.updateHealth(player.health !== undefined ? player.health : 20);
+
+            const closeBtn = document.getElementById('btn-inventory-close');
+            if (closeBtn) {
+                closeBtn.addEventListener('click', () => this.closeInventory());
+            }
+
+            if (typeof window !== 'undefined') {
+                window.addEventListener('keydown', (e) => {
+                    if (!this.isInventoryOpen) return;
+                    if (e.code === 'Escape') {
+                        if (typeof e.preventDefault === 'function') e.preventDefault();
+                        this.closeInventory();
+                        return;
+                    }
+                    if (e.code.startsWith('Digit') && e.code.length === 6) {
+                        const num = parseInt(e.code[5], 10);
+                        if (num >= 1 && num <= 9 && document.querySelector) {
+                            const hovered = document.querySelector('.inventory-slot:hover');
+                            if (hovered && hovered.dataset && hovered.dataset.blockId) {
+                                const blockId = parseInt(hovered.dataset.blockId, 10);
+                                this.setHotbarBlock(num - 1, blockId);
+                                const bDef = Blocks && Blocks.BLOCK_DEFS && Blocks.BLOCK_DEFS[blockId];
+                                this.showToast(`${bDef ? bDef.name : 'Block'} assigned to slot ${num}`);
+                            }
+                        }
+                    }
+                });
+            }
         }
 
         buildHotbar() {
@@ -65,13 +100,15 @@
                 iconCanvas.width = 36;
                 iconCanvas.height = 36;
                 const ictx = iconCanvas.getContext('2d');
-                ictx.imageSmoothingEnabled = false;
+                if (ictx) {
+                    ictx.imageSmoothingEnabled = false;
 
-                const tileIdx = Blocks.getBlockFaceTexture(blockId, 2); // top face
-                const tx = (tileIdx % 16) * 16;
-                const ty = Math.floor(tileIdx / 16) * 16;
+                    const tileIdx = Blocks.getBlockFaceTexture(blockId, 2); // top face
+                    const tx = (tileIdx % 16) * 16;
+                    const ty = Math.floor(tileIdx / 16) * 16;
 
-                ictx.drawImage(this.atlasCanvas, tx, ty, 16, 16, 0, 0, 36, 36);
+                    ictx.drawImage(this.atlasCanvas, tx, ty, 16, 16, 0, 0, 36, 36);
+                }
 
                 const num = document.createElement('span');
                 num.className = 'slot-num';
@@ -89,7 +126,110 @@
             }
         }
 
+        buildInventoryGrid() {
+            const gridEl = document.getElementById('inventory-grid');
+            if (!gridEl || !this.atlasCanvas || !Blocks) return;
+
+            gridEl.innerHTML = '';
+            // Render all 20 blocks defined in blocks.js (IDs 1 through 20)
+            for (let blockId = 1; blockId <= 20; blockId++) {
+                const bDef = Blocks.BLOCK_DEFS[blockId];
+                if (!bDef) continue;
+
+                const slot = document.createElement('div');
+                slot.className = 'inventory-slot';
+                slot.title = `${bDef.name} (Click to set in active hotbar slot, or hover & press 1-9)`;
+                slot.dataset = slot.dataset || {};
+                slot.dataset.blockId = blockId;
+
+                const iconCanvas = document.createElement('canvas');
+                iconCanvas.width = 36;
+                iconCanvas.height = 36;
+                const ictx = iconCanvas.getContext('2d');
+                if (ictx) {
+                    ictx.imageSmoothingEnabled = false;
+                    const tileIdx = Blocks.getBlockFaceTexture(blockId, 2);
+                    const tx = (tileIdx % 16) * 16;
+                    const ty = Math.floor(tileIdx / 16) * 16;
+                    ictx.drawImage(this.atlasCanvas, tx, ty, 16, 16, 0, 0, 36, 36);
+                }
+
+                const label = document.createElement('div');
+                label.className = 'inventory-slot-name';
+                label.innerText = bDef.name;
+
+                slot.appendChild(iconCanvas);
+                slot.appendChild(label);
+
+                slot.addEventListener('click', () => {
+                    const targetSlot = this.player ? this.player.selectedSlot : 0;
+                    this.setHotbarBlock(targetSlot, blockId);
+                    this.showToast(`${bDef.name} placed in slot ${targetSlot + 1}`);
+                });
+
+                gridEl.appendChild(slot);
+            }
+        }
+
+        setHotbarBlock(slotIndex, blockId) {
+            if (slotIndex < 0 || slotIndex >= 9) return;
+            this.hotbarBlocks[slotIndex] = blockId;
+            this.buildHotbar();
+            if (this.player) {
+                this.updateActiveSlot(this.player.selectedSlot);
+            }
+        }
+
+        toggleInventory() {
+            if (this.isInventoryOpen) {
+                this.closeInventory();
+            } else {
+                this.openInventory();
+            }
+        }
+
+        openInventory() {
+            this.isInventoryOpen = true;
+            if (this.inventoryOverlayEl) {
+                this.inventoryOverlayEl.style.display = 'flex';
+            }
+            if (this.player && typeof this.player.unlock === 'function') {
+                this.player.unlock();
+            }
+        }
+
+        closeInventory() {
+            this.isInventoryOpen = false;
+            if (this.inventoryOverlayEl) {
+                this.inventoryOverlayEl.style.display = 'none';
+            }
+            if (this.player && typeof this.player.lock === 'function') {
+                this.player.lock();
+            }
+        }
+
+        updateHealth(health) {
+            if (!this.heartsBarEl) {
+                this.heartsBarEl = document.getElementById('hearts-bar');
+            }
+            if (!this.heartsBarEl) return;
+            const hearts = this.heartsBarEl.querySelectorAll ? this.heartsBarEl.querySelectorAll('.heart') : [];
+            if (hearts && hearts.forEach) {
+                hearts.forEach((heart, idx) => {
+                    const heartHp = (idx + 1) * 2;
+                    if (health >= heartHp) {
+                        heart.className = 'heart';
+                    } else if (health === heartHp - 1) {
+                        heart.className = 'heart half';
+                    } else {
+                        heart.className = 'heart empty';
+                    }
+                });
+            }
+        }
+
         updateActiveSlot(index) {
+            if (typeof document === 'undefined') return;
             const slots = document.querySelectorAll('.hotbar-slot');
             slots.forEach((s, idx) => {
                 if (idx === index) {

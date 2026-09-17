@@ -9,14 +9,23 @@
     let sunLight, ambientLight, sunMesh, moonMesh, starField;
     let blockOutline;
     let particles = [];
+    let activeTNTs = [];
     let clock;
     let isPaused = true;
+
+    // Continuous mouse breaking / placing
+    let isMouseDown = false;
+    let activeMouseButton = -1; // 0: break, 2: place/interact
+    let mouseActionCooldown = 0;
+    const BREAK_COOLDOWN = 0.22;
+    const PLACE_COOLDOWN = 0.25;
 
     // Day/night cycle variables
     let dayTime = 0.25; // 0..1 (0.25 = morning, 0.5 = noon, 0.75 = dusk, 0 = midnight)
     const DAY_DURATION_SECONDS = 300; // 5 minutes per full cycle
 
-    const RENDER_RADIUS = 3; // Chunks around player (7x7 chunks = 112x112 blocks)
+    const LOAD_RADIUS = 3; // Chunks around player (7x7 chunks = 112x112 blocks)
+    const UNLOAD_RADIUS = 5; // Unload radius hysteresis
 
     function init() {
         // 1. Setup Scene & Camera
@@ -42,9 +51,15 @@
         atlasTexture.magFilter = THREE.NearestFilter;
         atlasTexture.minFilter = THREE.NearestFilter;
 
-        // 4. World setup
-        const savedSeed = parseInt(localStorage.getItem('minecraftlite_seed'), 10) || Math.floor(Math.random() * 100000);
-        world = new window.World.VoxelWorld(savedSeed);
+        // 4. World setup (preserve seed 0 strictly)
+        const storedSeed = localStorage.getItem('minecraftlite_seed');
+        let initialSeed;
+        if (storedSeed !== null && !isNaN(parseInt(storedSeed, 10))) {
+            initialSeed = parseInt(storedSeed, 10);
+        } else {
+            initialSeed = Math.floor(Math.random() * 100000);
+        }
+        world = new window.World.VoxelWorld(initialSeed);
 
         // Try restoring saved world modifications
         const savedWorld = localStorage.getItem('minecraftlite_world');
@@ -55,21 +70,24 @@
         // 5. Player controller
         player = new window.PlayerController(camera, renderer.domElement, world, audio);
 
-        // Find safe spawn altitude
-        const spawnX = 8.5;
-        const spawnZ = 8.5;
-        let groundY = 25;
-        // Pre-load spawn chunk to find surface
-        world.getOrCreateChunk(0, 0);
-        for (let y = window.World.CHUNK_HEIGHT - 1; y >= 0; y--) {
-            if (world.isSolid(Math.floor(spawnX), y, Math.floor(spawnZ))) {
-                groundY = y + 1;
-                break;
+        // Try restoring saved player state, otherwise spawn safely
+        const restoredPlayer = loadPlayerState();
+        if (!restoredPlayer) {
+            const spawnX = 8.5;
+            const spawnZ = 8.5;
+            let groundY = 25;
+            // Pre-load spawn chunk to find surface
+            world.getOrCreateChunk(0, 0);
+            for (let y = window.World.CHUNK_HEIGHT - 1; y >= 0; y--) {
+                if (world.isSolid(Math.floor(spawnX), y, Math.floor(spawnZ))) {
+                    groundY = y + 1;
+                    break;
+                }
             }
+            player.position.x = spawnX;
+            player.position.y = groundY + 1.0;
+            player.position.z = spawnZ;
         }
-        player.position.x = spawnX;
-        player.position.y = groundY + 1.0;
-        player.position.z = spawnZ;
 
         // 6. UI Manager
         window.UI.init(player, world, atlasCanvas);
@@ -91,6 +109,65 @@
 
         // 12. Start Loop
         requestAnimationFrame(animate);
+    }
+
+    function saveGameState() {
+        // 1. Save world voxels & seed
+        const json = world.saveToJSON();
+        localStorage.setItem('minecraftlite_world', json);
+        localStorage.setItem('minecraftlite_seed', String(world.seed));
+
+        // 2. Save player state, hotbar, and daytime
+        const playerData = {
+            position: { x: player.position.x, y: player.position.y, z: player.position.z },
+            yaw: player.yaw,
+            pitch: player.pitch,
+            selectedSlot: player.selectedSlot,
+            hotbarBlocks: window.UI ? window.UI.hotbarBlocks : undefined,
+            health: player.health !== undefined ? player.health : 20,
+            dayTime: dayTime,
+            isFlying: player.isFlying
+        };
+        localStorage.setItem('minecraftlite_player', JSON.stringify(playerData));
+        if (window.UI) window.UI.showToast('World & Player Saved!');
+    }
+
+    function loadPlayerState() {
+        const saved = localStorage.getItem('minecraftlite_player');
+        if (!saved) return false;
+        try {
+            const data = JSON.parse(saved);
+            if (data.position && typeof data.position.x === 'number' && typeof data.position.y === 'number' && typeof data.position.z === 'number') {
+                if (data.position.y > 0 && data.position.y < 128) {
+                    player.position.x = data.position.x;
+                    player.position.y = data.position.y;
+                    player.position.z = data.position.z;
+                }
+            }
+            if (typeof data.yaw === 'number') player.yaw = data.yaw;
+            if (typeof data.pitch === 'number') player.pitch = data.pitch;
+            if (typeof data.selectedSlot === 'number' && data.selectedSlot >= 0 && data.selectedSlot < 9) {
+                player.selectedSlot = data.selectedSlot;
+            }
+            if (Array.isArray(data.hotbarBlocks) && data.hotbarBlocks.length === 9 && window.UI) {
+                window.UI.hotbarBlocks = data.hotbarBlocks.slice();
+                window.UI.buildHotbar();
+            }
+            if (typeof data.health === 'number') {
+                player.health = Math.max(1, Math.min(20, data.health));
+                if (window.UI) window.UI.updateHealth(player.health);
+            }
+            if (typeof data.dayTime === 'number' && !isNaN(data.dayTime)) {
+                dayTime = data.dayTime;
+            }
+            if (typeof data.isFlying === 'boolean') {
+                player.isFlying = data.isFlying;
+            }
+            return true;
+        } catch (e) {
+            console.error('Failed to parse saved player state', e);
+            return false;
+        }
     }
 
     function setupLighting() {
@@ -157,9 +234,17 @@
             if (document.pointerLockElement === renderer.domElement) {
                 isPaused = false;
                 if (blocker) blocker.style.display = 'none';
+                if (window.UI && window.UI.isInventoryOpen) window.UI.closeInventory();
             } else {
-                isPaused = true;
-                if (blocker) blocker.style.display = 'flex';
+                isMouseDown = false;
+                activeMouseButton = -1;
+                if (window.UI && window.UI.isInventoryOpen) {
+                    isPaused = true;
+                    if (blocker) blocker.style.display = 'none';
+                } else {
+                    isPaused = true;
+                    if (blocker) blocker.style.display = 'flex';
+                }
             }
         });
 
@@ -169,16 +254,15 @@
 
         if (renderer && renderer.domElement) {
             renderer.domElement.addEventListener('click', () => {
-                if (!player.isLocked) lockPointer();
+                if (!player.isLocked && (!window.UI || !window.UI.isInventoryOpen)) {
+                    lockPointer();
+                }
             });
         }
 
         if (saveBtn) {
             saveBtn.addEventListener('click', () => {
-                const json = world.saveToJSON();
-                localStorage.setItem('minecraftlite_world', json);
-                localStorage.setItem('minecraftlite_seed', world.seed);
-                window.UI.showToast('World Saved to LocalStorage!');
+                saveGameState();
             });
         }
 
@@ -186,22 +270,27 @@
             loadBtn.addEventListener('click', () => {
                 const json = localStorage.getItem('minecraftlite_world');
                 if (json) {
-                    // Remove current chunk meshes and free GPU memory
+                    // Remove current chunk meshes and free GPU geometry
                     for (const chunk of world.chunks.values()) {
                         if (chunk.mesh) {
                             scene.remove(chunk.mesh);
                             if (chunk.mesh.geometry) chunk.mesh.geometry.dispose();
-                            if (chunk.mesh.material) chunk.mesh.material.dispose();
+                            chunk.mesh = null;
                         }
                         if (chunk.waterMesh) {
                             scene.remove(chunk.waterMesh);
                             if (chunk.waterMesh.geometry) chunk.waterMesh.geometry.dispose();
-                            if (chunk.waterMesh.material) chunk.waterMesh.material.dispose();
+                            chunk.waterMesh = null;
                         }
                     }
                     world.loadFromJSON(json);
+                    loadPlayerState();
+                    player.world = world;
+                    if (window.UI) {
+                        window.UI.world = world;
+                    }
                     loadSurroundingChunks(true);
-                    window.UI.showToast('World Loaded Successfully!');
+                    window.UI.showToast('World & Player Loaded Successfully!');
                 } else {
                     window.UI.showToast('No saved world found.');
                 }
@@ -212,24 +301,40 @@
             resetBtn.addEventListener('click', () => {
                 if (confirm('Generate a brand new world?')) {
                     localStorage.removeItem('minecraftlite_world');
+                    localStorage.removeItem('minecraftlite_player');
                     const newSeed = Math.floor(Math.random() * 100000);
-                    localStorage.setItem('minecraftlite_seed', newSeed);
+                    localStorage.setItem('minecraftlite_seed', String(newSeed));
 
                     for (const chunk of world.chunks.values()) {
                         if (chunk.mesh) {
                             scene.remove(chunk.mesh);
                             if (chunk.mesh.geometry) chunk.mesh.geometry.dispose();
-                            if (chunk.mesh.material) chunk.mesh.material.dispose();
+                            chunk.mesh = null;
                         }
                         if (chunk.waterMesh) {
                             scene.remove(chunk.waterMesh);
                             if (chunk.waterMesh.geometry) chunk.waterMesh.geometry.dispose();
-                            if (chunk.waterMesh.material) chunk.waterMesh.material.dispose();
+                            chunk.waterMesh = null;
                         }
                     }
+
+                    if (typeof world.disposeMaterials === 'function') {
+                        world.disposeMaterials();
+                    }
+
                     world = new window.World.VoxelWorld(newSeed);
                     player.world = world;
+                    if (window.UI) {
+                        window.UI.world = world;
+                        window.UI.updateHealth(20);
+                    }
+                    player.health = 20;
+                    player.position.x = 8.5;
                     player.position.y = 35;
+                    player.position.z = 8.5;
+                    player.velocity.x = 0;
+                    player.velocity.y = 0;
+                    player.velocity.z = 0;
                     loadSurroundingChunks(true);
                     window.UI.showToast('Generated New World!');
                     lockPointer();
@@ -237,17 +342,34 @@
             });
         }
 
-        // Mouse click for mining and placing blocks
+        // Mouse click and hold for continuous mining and placing
         window.addEventListener('mousedown', (e) => {
             if (isPaused || !player.isLocked) return;
+
+            isMouseDown = true;
+            activeMouseButton = e.button;
 
             if (e.button === 0) {
                 // Left Click: Break block
                 onBreakBlock();
+                mouseActionCooldown = 0.35;
             } else if (e.button === 2) {
-                // Right Click: Place block
-                onPlaceBlock();
+                // Right Click: Place or interact (e.g. ignite TNT)
+                onPlaceOrInteract();
+                mouseActionCooldown = 0.35;
             }
+        });
+
+        window.addEventListener('mouseup', (e) => {
+            if (e.button === activeMouseButton) {
+                isMouseDown = false;
+                activeMouseButton = -1;
+            }
+        });
+
+        window.addEventListener('blur', () => {
+            isMouseDown = false;
+            activeMouseButton = -1;
         });
 
         // Prevent context menu on right-click in game
@@ -279,6 +401,21 @@
         }
     }
 
+    function onPlaceOrInteract() {
+        if (!player.targetBlock || !player.targetBlock.hit) return;
+
+        const hitPos = player.targetBlock.blockPos;
+        const hitBlockId = world.getBlock(hitPos.x, hitPos.y, hitPos.z);
+
+        // Right-clicking TNT ignites it!
+        if (hitBlockId === window.Blocks.BLOCKS.TNT) {
+            igniteTNT(hitPos.x, hitPos.y, hitPos.z);
+            return;
+        }
+
+        onPlaceBlock();
+    }
+
     function onPlaceBlock() {
         if (!player.targetBlock || !player.targetBlock.hit) return;
 
@@ -295,6 +432,214 @@
         updateAffectedChunks(placePos.x, placePos.z);
         player.updateRaycast();
         updateBlockOutline();
+    }
+
+    function igniteTNT(bx, by, bz, fuse = 3.0) {
+        bx = Math.floor(bx);
+        by = Math.floor(by);
+        bz = Math.floor(bz);
+
+        const currentBlock = world.getBlock(bx, by, bz);
+        if (currentBlock === window.Blocks.BLOCKS.AIR) return;
+
+        world.setBlock(bx, by, bz, window.Blocks.BLOCKS.AIR);
+        updateAffectedChunks(bx, bz);
+        player.updateRaycast();
+        updateBlockOutline();
+
+        const tntGeo = new THREE.BoxGeometry(0.98, 0.98, 0.98);
+        const topUV = window.Blocks.getTileUV(window.Blocks.TILES.TNT_TOP);
+        const sideUV = window.Blocks.getTileUV(window.Blocks.TILES.TNT_SIDE);
+        const botUV = window.Blocks.getTileUV(window.Blocks.TILES.TNT_BOTTOM);
+
+        const uvAttr = tntGeo.attributes.uv;
+        if (uvAttr) {
+            const uvs = uvAttr.array;
+            const faceUVs = [sideUV, sideUV, topUV, botUV, sideUV, sideUV];
+            for (let f = 0; f < 6; f++) {
+                const { u0, v0, u1, v1 } = faceUVs[f];
+                const offset = f * 8;
+                uvs[offset]     = u0; uvs[offset + 1] = v1;
+                uvs[offset + 2] = u1; uvs[offset + 3] = v1;
+                uvs[offset + 4] = u0; uvs[offset + 5] = v0;
+                uvs[offset + 6] = u1; uvs[offset + 7] = v0;
+            }
+            uvAttr.needsUpdate = true;
+        }
+
+        const tntMat = new THREE.MeshLambertMaterial({
+            map: atlasTexture,
+            color: 0xffffff
+        });
+
+        const tntMesh = new THREE.Mesh(tntGeo, tntMat);
+        tntMesh.position.set(bx + 0.5, by + 0.5, bz + 0.5);
+        scene.add(tntMesh);
+
+        if (audio && typeof audio.playFuse === 'function') {
+            audio.playFuse();
+        }
+
+        activeTNTs.push({
+            mesh: tntMesh,
+            fuse: fuse,
+            velY: 2.5,
+            fuseAudioTimer: 0
+        });
+
+        if (window.UI) {
+            window.UI.showToast('TNT Ignited!');
+        }
+    }
+
+    function updateTNTs(dt) {
+        for (let i = activeTNTs.length - 1; i >= 0; i--) {
+            const tnt = activeTNTs[i];
+            tnt.fuse -= dt;
+            tnt.fuseAudioTimer += dt;
+
+            if (tnt.fuseAudioTimer > 0.45 && tnt.fuse > 0.4) {
+                tnt.fuseAudioTimer = 0;
+                if (audio && typeof audio.playFuse === 'function') {
+                    audio.playFuse();
+                }
+            }
+
+            // Flashing white effect and scale pulse
+            const flash = Math.floor(tnt.fuse * 8) % 2 === 0;
+            if (tnt.mesh.material) {
+                tnt.mesh.material.color.setHex(flash ? 0xffffff : 0xcccccc);
+                if (tnt.mesh.material.emissive) {
+                    tnt.mesh.material.emissive.setHex(flash ? 0x888888 : 0x000000);
+                }
+            }
+            const s = 1.0 + Math.sin(tnt.fuse * 12) * 0.05;
+            tnt.mesh.scale.set(s, s, s);
+
+            // Slight physics gravity if in air
+            tnt.velY -= 12.0 * dt;
+            tnt.mesh.position.y += tnt.velY * dt;
+            const floorY = Math.floor(tnt.mesh.position.y - 0.49);
+            const fx = Math.floor(tnt.mesh.position.x);
+            const fz = Math.floor(tnt.mesh.position.z);
+            if (world.isSolid(fx, floorY, fz)) {
+                tnt.mesh.position.y = floorY + 1.0 + 0.49;
+                tnt.velY = 0;
+            }
+
+            if (tnt.fuse <= 0) {
+                explodeTNT(tnt);
+                scene.remove(tnt.mesh);
+                if (tnt.mesh.geometry) tnt.mesh.geometry.dispose();
+                if (tnt.mesh.material) tnt.mesh.material.dispose();
+                activeTNTs.splice(i, 1);
+            }
+        }
+    }
+
+    function explodeTNT(tnt) {
+        const tPos = tnt.mesh.position;
+        if (audio && typeof audio.playExplode === 'function') {
+            audio.playExplode();
+        }
+
+        spawnExplosionParticles(tPos.x, tPos.y, tPos.z);
+
+        const radius = 3.5;
+        const tx = Math.floor(tPos.x);
+        const ty = Math.floor(tPos.y);
+        const tz = Math.floor(tPos.z);
+
+        const minX = tx - Math.ceil(radius);
+        const maxX = tx + Math.ceil(radius);
+        const minY = Math.max(1, ty - Math.ceil(radius));
+        const maxY = Math.min(window.World.CHUNK_HEIGHT - 1, ty + Math.ceil(radius));
+        const minZ = tz - Math.ceil(radius);
+        const maxZ = tz + Math.ceil(radius);
+
+        for (let x = minX; x <= maxX; x++) {
+            for (let y = minY; y <= maxY; y++) {
+                for (let z = minZ; z <= maxZ; z++) {
+                    const dx = x + 0.5 - tPos.x;
+                    const dy = y + 0.5 - tPos.y;
+                    const dz = z + 0.5 - tPos.z;
+                    if (dx * dx + dy * dy + dz * dz <= radius * radius) {
+                        const blockId = world.getBlock(x, y, z);
+                        if (blockId !== 0 && blockId !== window.Blocks.BLOCKS.BEDROCK && blockId !== window.Blocks.BLOCKS.OBSIDIAN) {
+                            if (blockId === window.Blocks.BLOCKS.TNT) {
+                                igniteTNT(x, y, z, 0.4 + Math.random() * 0.4);
+                            } else {
+                                world.setBlock(x, y, z, window.Blocks.BLOCKS.AIR);
+                                if (Math.random() < 0.25) {
+                                    spawnDebris(x, y, z, blockId);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update affected chunk meshes
+        for (let ox = -Math.ceil(radius / 16) - 1; ox <= Math.ceil(radius / 16) + 1; ox++) {
+            for (let oz = -Math.ceil(radius / 16) - 1; oz <= Math.ceil(radius / 16) + 1; oz++) {
+                const cx = Math.floor(tx / window.World.CHUNK_SIZE_X) + ox;
+                const cz = Math.floor(tz / window.World.CHUNK_SIZE_Z) + oz;
+                const chunk = world.getChunk(cx, cz);
+                if (chunk) {
+                    rebuildChunkMesh(chunk);
+                }
+            }
+        }
+
+        // Knockback and damage on player
+        const pVec = {
+            x: player.position.x - tPos.x,
+            y: (player.position.y + 0.9) - tPos.y,
+            z: player.position.z - tPos.z
+        };
+        const dist = Math.sqrt(pVec.x * pVec.x + pVec.y * pVec.y + pVec.z * pVec.z);
+        if (dist < 8.0) {
+            const normX = pVec.x / Math.max(0.01, dist);
+            const normZ = pVec.z / Math.max(0.01, dist);
+            const force = (1.0 - dist / 8.0) * 24.0;
+            player.velocity.x += normX * force;
+            player.velocity.y += Math.max(6.0, force * 0.7);
+            player.velocity.z += normZ * force;
+
+            if (!player.isFlying && typeof player.takeDamage === 'function') {
+                const dmg = Math.round((1.0 - dist / 8.0) * 14);
+                if (dmg > 0) player.takeDamage(dmg);
+            }
+        }
+
+        player.updateRaycast();
+        updateBlockOutline();
+    }
+
+    function spawnExplosionParticles(x, y, z) {
+        for (let i = 0; i < 28; i++) {
+            const size = 0.2 + Math.random() * 0.25;
+            const geo = new THREE.BoxGeometry(size, size, size);
+            const isFire = Math.random() > 0.4;
+            const color = isFire ? (Math.random() > 0.5 ? 0xff4400 : 0xffaa00) : 0x555555;
+            const mat = new THREE.MeshBasicMaterial({ color });
+            const pMesh = new THREE.Mesh(geo, mat);
+            pMesh.position.set(x, y, z);
+            scene.add(pMesh);
+
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 4.0 + Math.random() * 8.0;
+            particles.push({
+                mesh: pMesh,
+                vel: {
+                    x: Math.cos(angle) * speed,
+                    y: 3.0 + Math.random() * 7.0,
+                    z: Math.sin(angle) * speed
+                },
+                life: 0.8 + Math.random() * 0.4
+            });
+        }
     }
 
     function spawnDebris(x, y, z, blockId) {
@@ -370,13 +715,47 @@
         const pCx = Math.floor(player.position.x / window.World.CHUNK_SIZE_X);
         const pCz = Math.floor(player.position.z / window.World.CHUNK_SIZE_Z);
 
-        for (let rx = -RENDER_RADIUS; rx <= RENDER_RADIUS; rx++) {
-            for (let rz = -RENDER_RADIUS; rz <= RENDER_RADIUS; rz++) {
+        // 1. Load / mesh chunks within LOAD_RADIUS
+        for (let rx = -LOAD_RADIUS; rx <= LOAD_RADIUS; rx++) {
+            for (let rz = -LOAD_RADIUS; rz <= LOAD_RADIUS; rz++) {
                 const cx = pCx + rx;
                 const cz = pCz + rz;
                 const chunk = world.getOrCreateChunk(cx, cz);
                 if (chunk.dirty) {
                     rebuildChunkMesh(chunk);
+                }
+            }
+        }
+
+        // 2. Unload distant chunks beyond UNLOAD_RADIUS (hysteresis prevents thrashing)
+        for (const [key, chunk] of world.chunks.entries()) {
+            const dist = Math.max(Math.abs(chunk.chunkX - pCx), Math.abs(chunk.chunkZ - pCz));
+            if (dist > UNLOAD_RADIUS) {
+                if (chunk.mesh) {
+                    scene.remove(chunk.mesh);
+                    if (chunk.mesh.geometry) chunk.mesh.geometry.dispose();
+                    chunk.mesh = null;
+                }
+                if (chunk.waterMesh) {
+                    scene.remove(chunk.waterMesh);
+                    if (chunk.waterMesh.geometry) chunk.waterMesh.geometry.dispose();
+                    chunk.waterMesh = null;
+                }
+
+                // Check if chunk has modifications
+                let hasModifications = false;
+                for (const mKey of world.modifiedBlocks.keys()) {
+                    const [mx, , mz] = mKey.split(',').map(Number);
+                    if (Math.floor(mx / window.World.CHUNK_SIZE_X) === chunk.chunkX &&
+                        Math.floor(mz / window.World.CHUNK_SIZE_Z) === chunk.chunkZ) {
+                        hasModifications = true;
+                        break;
+                    }
+                }
+                if (!hasModifications) {
+                    world.chunks.delete(key);
+                } else {
+                    chunk.dirty = true;
                 }
             }
         }
@@ -492,8 +871,23 @@
 
         if (!isPaused) {
             player.update(dt);
+
+            // Handle continuous mouse breaking / placing
+            if (player.isLocked && isMouseDown) {
+                mouseActionCooldown -= dt;
+                if (mouseActionCooldown <= 0) {
+                    if (activeMouseButton === 0) {
+                        onBreakBlock();
+                        mouseActionCooldown = BREAK_COOLDOWN;
+                    } else if (activeMouseButton === 2) {
+                        onPlaceOrInteract();
+                        mouseActionCooldown = PLACE_COOLDOWN;
+                    }
+                }
+            }
         }
 
+        updateTNTs(dt);
         updateDayNightCycle(dt);
         updateParticles(dt);
         updateBlockOutline();

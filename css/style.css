@@ -146,6 +146,16 @@ html, body {
     background: #ff2222;
     clip-path: path('M7 13.5 C7 13.5 1 9 1 4.5 C1 2 3 0.5 5 1.5 C6 2 7 3.5 7 3.5 C7 3.5 8 2 9 1.5 C11 0.5 13 2 13 4.5 C13 9 7 13.5 7 13.5 Z');
     filter: drop-shadow(1px 1px 0px #000);
+    transition: background 0.1s ease;
+}
+
+.heart.half {
+    background: linear-gradient(to right, #ff2222 50%, #3a3a3a 50%);
+}
+
+.heart.empty {
+    background: #2a2a2a;
+    opacity: 0.55;
 }
 
 /* Hotbar */
@@ -324,3 +334,126 @@ html, body {
     color: #ffff88;
     font-size: 11px;
 }
+
+/* Creative Inventory Overlay ('E') */
+#inventory-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(3px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 60;
+    cursor: default;
+}
+
+.inventory-box {
+    background: #252525;
+    border: 3px solid #5a5a5a;
+    border-radius: 6px;
+    padding: 20px 24px;
+    width: 520px;
+    max-width: 95vw;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+}
+
+.inventory-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.inventory-title {
+    font-family: 'Trebuchet MS', 'Arial Black', sans-serif;
+    font-size: 22px;
+    font-weight: bold;
+    color: #e0e0e0;
+    text-shadow: 2px 2px 0 #000;
+    letter-spacing: 1px;
+}
+
+.inventory-close-btn {
+    background: transparent;
+    border: none;
+    color: #aaa;
+    font-size: 28px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 4px;
+}
+
+.inventory-close-btn:hover {
+    color: #fff;
+}
+
+.inventory-subtitle {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 16px;
+}
+
+.inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    background: rgba(18, 18, 18, 0.75);
+    border: 2px solid #373737;
+    border-radius: 4px;
+    padding: 14px;
+    max-height: 60vh;
+    overflow-y: auto;
+}
+
+.inventory-slot {
+    aspect-ratio: 1;
+    background: #8b8b8b;
+    border: 2px solid #373737;
+    border-top-color: #373737;
+    border-left-color: #373737;
+    border-right-color: #ffffff;
+    border-bottom-color: #ffffff;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 6px;
+    border-radius: 2px;
+    transition: transform 0.08s ease, background 0.08s ease;
+}
+
+.inventory-slot:hover {
+    background: #a6a6a6;
+    outline: 2px solid #ffff55;
+    transform: scale(1.05);
+    z-index: 5;
+}
+
+.inventory-slot canvas {
+    image-rendering: pixelated;
+    width: 38px;
+    height: 38px;
+    pointer-events: none;
+}
+
+.inventory-slot-name {
+    font-family: Consolas, monospace;
+    font-size: 10px;
+    color: #ffffff;
+    text-shadow: 1px 1px 1px #000;
+    margin-top: 4px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 100%;
+    pointer-events: none;
+}
+

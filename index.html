@@ -38,6 +38,18 @@
         <div id="hotbar"></div>
     </div>
 
+    <!-- Creative Block Inventory Overlay ('E') -->
+    <div id="inventory-overlay" style="display: none;">
+        <div class="inventory-box">
+            <div class="inventory-header">
+                <span class="inventory-title">Creative Inventory</span>
+                <button id="btn-inventory-close" class="inventory-close-btn">&times;</button>
+            </div>
+            <div class="inventory-subtitle">Click a block to put in current hotbar slot, or hover and press 1-9. Press 'E' or Esc to close.</div>
+            <div id="inventory-grid" class="inventory-grid"></div>
+        </div>
+    </div>
+
     <!-- Pause & Start Menu -->
     <div id="pause-menu">
         <div class="menu-box">
@@ -54,8 +66,9 @@
                 <div><span class="key-badge">Mezerník</span> : Skok / Let nahoru (Jump)</div>
                 <div><span class="key-badge">Shift</span> : Plížení / Let dolů (Sneak)</div>
                 <div><span class="key-badge">F</span> : Přepnout Creative Létání (Fly Mode)</div>
-                <div><span class="key-badge">Levé tl. myši</span> : Těžit blok (Break)</div>
-                <div><span class="key-badge">Pravé tl. myši</span> : Položit blok (Place)</div>
+                <div><span class="key-badge">E</span> : Inventář všech 20 bloků (Creative Inventory)</div>
+                <div><span class="key-badge">Levé tl. myši</span> : Těžit blok (Hold to dig)</div>
+                <div><span class="key-badge">Pravé tl. myši</span> : Položit / Zapálit TNT (Place / Ignite)</div>
                 <div><span class="key-badge">1</span> - <span class="key-badge">9</span> / <span class="key-badge">Kolečko</span> : Výběr bloku (Select)</div>
                 <div><span class="key-badge">F3</span> : Debug info & souřadnice (Debug)</div>
                 <div><span class="key-badge">Esc</span> : Pozastavit / Menu (Pause)</div>

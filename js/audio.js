@@ -208,6 +208,106 @@
             noise.start(t);
             noise.stop(t + 0.25);
         }
+
+        /**
+         * TNT fuse hiss / sizzle
+         */
+        playFuse() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+
+            const t = this.ctx.currentTime;
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = this.createNoiseBuffer(0.2);
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(3000, t);
+            filter.frequency.exponentialRampToValueAtTime(1500, t + 0.18);
+            filter.Q.setValueAtTime(3.5, t);
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.25, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.19);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            noise.start(t);
+            noise.stop(t + 0.2);
+        }
+
+        /**
+         * TNT explosion sound (low rumble oscillator + noise blast)
+         */
+        playExplode() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+
+            const t = this.ctx.currentTime;
+
+            // Deep rumble oscillator
+            const osc = this.ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(130, t);
+            osc.frequency.exponentialRampToValueAtTime(25, t + 0.5);
+
+            const oscGain = this.ctx.createGain();
+            oscGain.gain.setValueAtTime(0.5, t);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.55);
+
+            osc.connect(oscGain);
+            oscGain.connect(this.ctx.destination);
+
+            osc.start(t);
+            osc.stop(t + 0.6);
+
+            // Explosive blast noise
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = this.createNoiseBuffer(0.7);
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(1200, t);
+            filter.frequency.exponentialRampToValueAtTime(60, t + 0.65);
+
+            const nGain = this.ctx.createGain();
+            nGain.gain.setValueAtTime(0.65, t);
+            nGain.gain.exponentialRampToValueAtTime(0.01, t + 0.68);
+
+            noise.connect(filter);
+            filter.connect(nGain);
+            nGain.connect(this.ctx.destination);
+
+            noise.start(t);
+            noise.stop(t + 0.7);
+        }
+
+        /**
+         * Player hurt sound (classic Minecraft oof)
+         */
+        playHurt() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(190, t);
+            osc.frequency.exponentialRampToValueAtTime(75, t + 0.16);
+
+            gain.gain.setValueAtTime(0.4, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.16);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(t);
+            osc.stop(t + 0.17);
+        }
     }
 
     return SoundFX;
