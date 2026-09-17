@@ -22,7 +22,8 @@ describe('Full Browser & WebGL Game Simulation', () => {
         const mockElements = new Map();
         function getOrCreateElement(id) {
             if (!mockElements.has(id)) {
-                mockElements.set(id, {
+                const listeners = new Map();
+                const el = {
                     id,
                     style: {},
                     classList: {
@@ -33,8 +34,24 @@ describe('Full Browser & WebGL Game Simulation', () => {
                     appendChild: () => {},
                     innerHTML: '',
                     innerText: '',
-                    addEventListener: () => {}
+                    addEventListener: (type, handler) => {
+                        if (!listeners.has(type)) listeners.set(type, []);
+                        listeners.get(type).push(handler);
+                    },
+                    click: () => {
+                        const fns = listeners.get('click') || [];
+                        for (const fn of fns) fn({ stopPropagation: () => {} });
+                    },
+                    setAttribute: (k, v) => { el[k] = v; }
+                };
+                let _dataset = {};
+                Object.defineProperty(el, 'dataset', {
+                    get: () => _dataset,
+                    set: () => {
+                        throw new TypeError('Cannot set property dataset of #<HTMLElement> which has only a getter');
+                    }
                 });
+                mockElements.set(id, el);
             }
             return mockElements.get(id);
         }
@@ -79,25 +96,38 @@ describe('Full Browser & WebGL Game Simulation', () => {
                 domListeners.get(type).push(handler);
             },
             createElement: (tag) => {
-                if (tag === 'canvas') {
-                    return {
-                        width: 256,
-                        height: 256,
-                        getContext: () => ({
-                            fillStyle: '',
-                            fillRect: () => {},
-                            drawImage: () => {}
-                        }),
-                        addEventListener: () => {},
-                        style: {}
-                    };
-                }
-                return {
+                const listeners = new Map();
+                const el = {
                     style: {},
                     classList: { add: () => {}, remove: () => {} },
                     appendChild: () => {},
-                    addEventListener: () => {}
+                    addEventListener: (type, handler) => {
+                        if (!listeners.has(type)) listeners.set(type, []);
+                        listeners.get(type).push(handler);
+                    },
+                    click: () => {
+                        const fns = listeners.get('click') || [];
+                        for (const fn of fns) fn({ stopPropagation: () => {} });
+                    },
+                    setAttribute: (k, v) => { el[k] = v; }
                 };
+                let _dataset = {};
+                Object.defineProperty(el, 'dataset', {
+                    get: () => _dataset,
+                    set: () => {
+                        throw new TypeError('Cannot set property dataset of #<HTMLElement> which has only a getter');
+                    }
+                });
+                if (tag === 'canvas') {
+                    el.width = 256;
+                    el.height = 256;
+                    el.getContext = () => ({
+                        fillStyle: '',
+                        fillRect: () => {},
+                        drawImage: () => {}
+                    });
+                }
+                return el;
             }
         };
 
@@ -208,5 +238,71 @@ describe('Full Browser & WebGL Game Simulation', () => {
         const reloadedWorld = new ctx.World.VoxelWorld(777);
         reloadedWorld.loadFromJSON(json);
         assert.strictEqual(reloadedWorld.getBlock(targetBlockPos.x, targetBlockPos.y, targetBlockPos.z), ctx.Blocks.BLOCKS.BRICK, 'Placed brick persists in loaded world');
+
+        // UI Manager initialization with getter-only dataset elements
+        assert.doesNotThrow(() => {
+            ctx.UI.init(player, world, atlas);
+        }, 'UI.init must not throw on elements with getter-only dataset');
+
+        assert.strictEqual(ctx.UI.hotbarBlocks.length, 9, 'Hotbar initialized with 9 slots');
+        assert.strictEqual(ctx.UI.isInventoryOpen, false, 'Inventory starts closed');
+
+        // Verify start / resume menu dismissal and pointer lock interaction
+        const pauseMenu = ctx.document.getElementById('pause-menu');
+        const resumeBtn = ctx.document.getElementById('btn-resume');
+        pauseMenu.style.display = 'flex';
+
+        let pointerLocked = false;
+        fakeDom.requestPointerLock = () => {
+            pointerLocked = true;
+            ctx.document.pointerLockElement = fakeDom;
+            const changeHandlers = domListeners.get('pointerlockchange') || [];
+            for (const handler of changeHandlers) handler();
+        };
+
+        function resumeGame() {
+            pauseMenu.style.display = 'none';
+            audio.init();
+            player.lock();
+        }
+
+        // Wire up game input listener
+        resumeBtn.addEventListener('click', (e) => {
+            if (e && e.stopPropagation) e.stopPropagation();
+            resumeGame();
+        });
+
+        ctx.document.addEventListener('pointerlockchange', () => {
+            if (ctx.document.pointerLockElement === fakeDom) {
+                pauseMenu.style.display = 'none';
+            } else {
+                pauseMenu.style.display = 'flex';
+            }
+        });
+
+        ctx.document.addEventListener('pointerlockerror', () => {
+            // pointerlockerror does not force pause menu to reappear
+        });
+
+        // Trigger start click
+        resumeBtn.click();
+        assert.strictEqual(pointerLocked, true, 'Clicking resume button requests pointer lock');
+        assert.strictEqual(pauseMenu.style.display, 'none', 'Clicking resume button dismisses pause menu immediately');
+
+        // Verify pointerlockerror does not reopen pause menu
+        const errorHandlers = domListeners.get('pointerlockerror') || [];
+        for (const handler of errorHandlers) handler();
+        assert.strictEqual(pauseMenu.style.display, 'none', 'pointerlockerror does not reopen pause menu');
+
+        // Simulate creative inventory toggle with 'E'
+        const keydownHandlers = domListeners.get('keydown') || [];
+        for (const handler of keydownHandlers) {
+            handler({ code: 'KeyE', preventDefault: () => {} });
+        }
+        assert.strictEqual(ctx.UI.isInventoryOpen, true, 'Pressing E opens creative inventory');
+
+        // Close inventory
+        ctx.UI.closeInventory();
+        assert.strictEqual(ctx.UI.isInventoryOpen, false, 'Closing inventory hides overlay');
     });
 });

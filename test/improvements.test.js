@@ -377,6 +377,122 @@ describe('Improvements & Roadmap Verification Tests', () => {
             UI.setHotbarBlock(3, UI.hoveredBlockId);
             assert.strictEqual(UI.hotbarBlocks[3], Blocks.BLOCKS.GOLD_ORE);
         });
+
+        test('UI Manager buildInventoryGrid works with getter-only dataset elements (browser DOM standard)', () => {
+            const UI = require('../js/ui.js');
+            const gridChildren = [];
+            const mockGridEl = {
+                id: 'inventory-grid',
+                innerHTML: '',
+                appendChild: (child) => { gridChildren.push(child); }
+            };
+
+            const originalDoc = global.document;
+            try {
+                global.document = {
+                    getElementById: (id) => (id === 'inventory-grid' ? mockGridEl : null),
+                    createElement: (tag) => {
+                        const el = {
+                            style: {},
+                            classList: { add: () => {}, remove: () => {} },
+                            appendChild: () => {},
+                            addEventListener: () => {},
+                            setAttribute: (k, v) => { el[k] = v; }
+                        };
+                        if (tag === 'canvas') {
+                            el.getContext = () => ({
+                                imageSmoothingEnabled: true,
+                                drawImage: () => {}
+                            });
+                        }
+                        let _dataset = {};
+                        Object.defineProperty(el, 'dataset', {
+                            get: () => _dataset,
+                            set: () => {
+                                throw new TypeError('Cannot set property dataset of #<HTMLElement> which has only a getter');
+                            }
+                        });
+                        return el;
+                    }
+                };
+
+                const mockAtlasCanvas = {
+                    width: 256,
+                    height: 256
+                };
+
+                UI.atlasCanvas = mockAtlasCanvas;
+                assert.doesNotThrow(() => {
+                    UI.buildInventoryGrid();
+                }, 'buildInventoryGrid must not throw when HTMLElement has getter-only dataset');
+
+                assert.strictEqual(gridChildren.length, 20, 'Should have created 20 block inventory slots');
+                assert.strictEqual(gridChildren[0].dataset.blockId, 1, 'First slot blockId should be 1');
+                assert.strictEqual(gridChildren[19].dataset.blockId, 20, 'Twentieth slot blockId should be 20');
+            } finally {
+                global.document = originalDoc;
+            }
+        });
+
+        test('UI Manager buildInventoryGrid does not throw when dataset is undefined or throws on access', () => {
+            const UI = require('../js/ui.js');
+            const gridChildren = [];
+            const mockGridEl = {
+                id: 'inventory-grid',
+                innerHTML: '',
+                appendChild: (child) => { gridChildren.push(child); }
+            };
+
+            const originalDoc = global.document;
+            try {
+                global.document = {
+                    getElementById: (id) => (id === 'inventory-grid' ? mockGridEl : null),
+                    createElement: () => {
+                        const el = {
+                            style: {},
+                            classList: { add: () => {}, remove: () => {} },
+                            appendChild: () => {},
+                            addEventListener: () => {},
+                            setAttribute: (k, v) => { el[k] = v; }
+                        };
+                        // dataset throws on any property access
+                        Object.defineProperty(el, 'dataset', {
+                            get: () => { throw new Error('Restricted dataset access'); }
+                        });
+                        return el;
+                    }
+                };
+
+                UI.atlasCanvas = { width: 256, height: 256 };
+                assert.doesNotThrow(() => {
+                    UI.buildInventoryGrid();
+                }, 'buildInventoryGrid must not throw even if dataset throws on access');
+
+                assert.strictEqual(gridChildren.length, 20, 'Should have created 20 block inventory slots');
+                assert.strictEqual(gridChildren[0]['data-block-id'], 1, 'Attribute fallback stores block ID');
+            } finally {
+                global.document = originalDoc;
+            }
+        });
+
+        test('PlayerController lock and unlock methods handle missing or failing APIs gracefully', () => {
+            const PlayerController = require('../js/player.js');
+            const dummyCamera = { position: { set: () => {} } };
+            const throwingDom = {
+                requestPointerLock: () => {
+                    throw new Error('SecurityError: Pointer lock denied');
+                }
+            };
+
+            const player = new PlayerController(dummyCamera, throwingDom, null, null);
+            assert.doesNotThrow(() => {
+                player.lock();
+            }, 'player.lock must not throw even when requestPointerLock throws synchronously');
+
+            assert.doesNotThrow(() => {
+                player.unlock();
+            }, 'player.unlock must not throw in node/test environment');
+        });
     });
 });
 

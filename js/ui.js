@@ -75,6 +75,9 @@
                                 const hovered = document.querySelector('.inventory-slot:hover');
                                 if (hovered && hovered.dataset && hovered.dataset.blockId) {
                                     blockId = parseInt(hovered.dataset.blockId, 10);
+                                } else if (hovered && typeof hovered.getAttribute === 'function') {
+                                    const attr = hovered.getAttribute('data-block-id');
+                                    if (attr) blockId = parseInt(attr, 10);
                                 }
                             }
                             if (blockId) {
@@ -105,7 +108,7 @@
                 const iconCanvas = document.createElement('canvas');
                 iconCanvas.width = 36;
                 iconCanvas.height = 36;
-                const ictx = iconCanvas.getContext('2d');
+                const ictx = typeof iconCanvas.getContext === 'function' ? iconCanvas.getContext('2d') : null;
                 if (ictx) {
                     ictx.imageSmoothingEnabled = false;
 
@@ -145,13 +148,19 @@
                 const slot = document.createElement('div');
                 slot.className = 'inventory-slot';
                 slot.title = `${bDef.name} (Click to set in active hotbar slot, or hover & press 1-9)`;
-                slot.dataset = slot.dataset || {};
-                slot.dataset.blockId = blockId;
+                try {
+                    if (slot.dataset) {
+                        slot.dataset.blockId = blockId;
+                    }
+                } catch (e) {}
+                if (typeof slot.setAttribute === 'function') {
+                    slot.setAttribute('data-block-id', blockId);
+                }
 
                 const iconCanvas = document.createElement('canvas');
                 iconCanvas.width = 36;
                 iconCanvas.height = 36;
-                const ictx = iconCanvas.getContext('2d');
+                const ictx = typeof iconCanvas.getContext === 'function' ? iconCanvas.getContext('2d') : null;
                 if (ictx) {
                     ictx.imageSmoothingEnabled = false;
                     const tileIdx = Blocks.getBlockFaceTexture(blockId, 0); // side face (displays distinctive textures for Bookshelf, TNT, Wood, etc.)

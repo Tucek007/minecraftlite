@@ -86,14 +86,23 @@
         }
 
         lock() {
-            if (this.domElement && this.domElement.requestPointerLock) {
-                this.domElement.requestPointerLock();
+            if (this.domElement && typeof this.domElement.requestPointerLock === 'function') {
+                try {
+                    const promise = this.domElement.requestPointerLock();
+                    if (promise && typeof promise.catch === 'function') {
+                        promise.catch(() => {});
+                    }
+                } catch (e) {
+                    console.warn('Pointer lock request failed:', e);
+                }
             }
         }
 
         unlock() {
-            if (document.exitPointerLock) {
-                document.exitPointerLock();
+            if (typeof document !== 'undefined' && typeof document.exitPointerLock === 'function') {
+                try {
+                    document.exitPointerLock();
+                } catch (e) {}
             }
         }
 

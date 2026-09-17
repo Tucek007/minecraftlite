@@ -28,7 +28,30 @@
     const LOAD_RADIUS = 3; // Chunks around player (7x7 chunks = 112x112 blocks)
     const UNLOAD_RADIUS = 5; // Unload radius hysteresis
 
+    function safeGetStorage(key) {
+        try {
+            return localStorage.getItem(key);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function safeSetStorage(key, val) {
+        try {
+            localStorage.setItem(key, val);
+        } catch (e) {}
+    }
+
+    function safeRemoveStorage(key) {
+        try {
+            localStorage.removeItem(key);
+        } catch (e) {}
+    }
+
+    let initialized = false;
     function init() {
+        if (initialized) return;
+        initialized = true;
         // 1. Setup Scene & Camera
         scene = new THREE.Scene();
         scene.background = new THREE.Color(0x78a7ff);
@@ -58,7 +81,7 @@
         });
 
         // 4. World setup (preserve seed 0 strictly)
-        const storedSeed = localStorage.getItem('minecraftlite_seed');
+        const storedSeed = safeGetStorage('minecraftlite_seed');
         let initialSeed;
         if (storedSeed !== null && !isNaN(parseInt(storedSeed, 10))) {
             initialSeed = parseInt(storedSeed, 10);
@@ -68,13 +91,16 @@
         world = new window.World.VoxelWorld(initialSeed);
 
         // Try restoring saved world modifications
-        const savedWorld = localStorage.getItem('minecraftlite_world');
+        const savedWorld = safeGetStorage('minecraftlite_world');
         if (savedWorld) {
             world.loadFromJSON(savedWorld);
         }
 
         // 5. Player controller
         player = new window.PlayerController(camera, renderer.domElement, world, audio);
+
+        // 6. UI Manager (initialize before loadPlayerState so hotbar canvas is ready)
+        window.UI.init(player, world, atlasCanvas);
 
         // Try restoring saved player state, otherwise spawn safely
         const restoredPlayer = loadPlayerState();
@@ -86,9 +112,6 @@
             player.fallDistance = 0;
             player.onGround = true;
         }
-
-        // 6. UI Manager
-        window.UI.init(player, world, atlasCanvas);
 
         // 7. Lighting & Atmosphere
         setupLighting();
@@ -112,8 +135,8 @@
     function saveGameState(silent = false) {
         // 1. Save world voxels & seed
         const json = world.saveToJSON();
-        localStorage.setItem('minecraftlite_world', json);
-        localStorage.setItem('minecraftlite_seed', String(world.seed));
+        safeSetStorage('minecraftlite_world', json);
+        safeSetStorage('minecraftlite_seed', String(world.seed));
 
         // 2. Save player state, hotbar, and daytime
         const playerData = {
@@ -126,24 +149,24 @@
             dayTime: dayTime,
             isFlying: player.isFlying
         };
-        localStorage.setItem('minecraftlite_player', JSON.stringify(playerData));
+        safeSetStorage('minecraftlite_player', JSON.stringify(playerData));
         if (!silent && window.UI) window.UI.showToast('World & Player Saved!');
     }
 
     function loadPlayerState() {
-        const saved = localStorage.getItem('minecraftlite_player');
+        const saved = safeGetStorage('minecraftlite_player');
         if (!saved) return false;
         try {
             const data = JSON.parse(saved);
             if (data.position && typeof data.position.x === 'number' && typeof data.position.y === 'number' && typeof data.position.z === 'number') {
-                if (data.position.y > 0 && data.position.y < 128) {
+                if (data.position.y > 0 && data.position.y < 128 && !isNaN(data.position.x) && !isNaN(data.position.y) && !isNaN(data.position.z)) {
                     player.position.x = data.position.x;
                     player.position.y = data.position.y;
                     player.position.z = data.position.z;
                 }
             }
-            if (typeof data.yaw === 'number') player.yaw = data.yaw;
-            if (typeof data.pitch === 'number') player.pitch = data.pitch;
+            if (typeof data.yaw === 'number' && !isNaN(data.yaw)) player.yaw = data.yaw;
+            if (typeof data.pitch === 'number' && !isNaN(data.pitch)) player.pitch = data.pitch;
             if (typeof data.selectedSlot === 'number' && data.selectedSlot >= 0 && data.selectedSlot < 9) {
                 player.selectedSlot = data.selectedSlot;
                 if (window.UI) window.UI.updateActiveSlot(player.selectedSlot);
@@ -152,7 +175,7 @@
                 window.UI.hotbarBlocks = data.hotbarBlocks.slice();
                 window.UI.buildHotbar();
             }
-            if (typeof data.health === 'number') {
+            if (typeof data.health === 'number' && !isNaN(data.health)) {
                 player.health = Math.max(1, Math.min(20, data.health));
                 if (window.UI) window.UI.updateHealth(player.health);
             }
@@ -229,6 +252,19 @@
             player.lock();
         }
 
+        function resumeGame() {
+            isPaused = false;
+            if (blocker) blocker.style.display = 'none';
+            if (window.UI && window.UI.isInventoryOpen) window.UI.closeInventory();
+            lockPointer();
+        }
+
+        function pauseGame() {
+            isPaused = true;
+            player.unlock();
+            if (blocker) blocker.style.display = 'flex';
+        }
+
         document.addEventListener('pointerlockchange', () => {
             if (document.pointerLockElement === renderer.domElement) {
                 isPaused = false;
@@ -248,10 +284,7 @@
         });
 
         document.addEventListener('pointerlockerror', () => {
-            isPaused = true;
-            if (blocker && (!window.UI || !window.UI.isInventoryOpen)) {
-                blocker.style.display = 'flex';
-            }
+            console.warn('Pointer lock request was denied or interrupted.');
         });
 
         window.addEventListener('beforeunload', () => {
@@ -259,16 +292,39 @@
         });
 
         if (resumeBtn) {
-            resumeBtn.addEventListener('click', () => lockPointer());
+            resumeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                resumeGame();
+            });
+        }
+
+        if (blocker) {
+            blocker.addEventListener('click', (e) => {
+                if (e.target === blocker) {
+                    resumeGame();
+                }
+            });
         }
 
         if (renderer && renderer.domElement) {
             renderer.domElement.addEventListener('click', () => {
-                if (!player.isLocked && (!window.UI || !window.UI.isInventoryOpen)) {
+                if (isPaused) {
+                    resumeGame();
+                } else if (!player.isLocked && (!window.UI || !window.UI.isInventoryOpen)) {
                     lockPointer();
                 }
             });
         }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Escape') {
+                if (window.UI && window.UI.isInventoryOpen) {
+                    window.UI.closeInventory();
+                } else if (!isPaused) {
+                    pauseGame();
+                }
+            }
+        });
 
         if (saveBtn) {
             saveBtn.addEventListener('click', () => {
@@ -296,7 +352,7 @@
 
         if (loadBtn) {
             loadBtn.addEventListener('click', () => {
-                const json = localStorage.getItem('minecraftlite_world');
+                const json = safeGetStorage('minecraftlite_world');
                 if (json) {
                     clearActiveEntities();
 
@@ -321,6 +377,7 @@
                     }
                     loadSurroundingChunks(true);
                     window.UI.showToast('World & Player Loaded Successfully!');
+                    resumeGame();
                 } else {
                     window.UI.showToast('No saved world found.');
                 }
@@ -330,10 +387,10 @@
         if (resetBtn) {
             resetBtn.addEventListener('click', () => {
                 if (confirm('Generate a brand new world?')) {
-                    localStorage.removeItem('minecraftlite_world');
-                    localStorage.removeItem('minecraftlite_player');
+                    safeRemoveStorage('minecraftlite_world');
+                    safeRemoveStorage('minecraftlite_player');
                     const newSeed = Math.floor(Math.random() * 100000);
-                    localStorage.setItem('minecraftlite_seed', String(newSeed));
+                    safeSetStorage('minecraftlite_seed', String(newSeed));
 
                     clearActiveEntities();
 
@@ -373,7 +430,7 @@
                     dayTime = 0.25;
                     loadSurroundingChunks(true);
                     window.UI.showToast('Generated New World!');
-                    lockPointer();
+                    resumeGame();
                 }
             });
         }
@@ -939,5 +996,9 @@
         renderer.render(scene, camera);
     }
 
-    window.addEventListener('DOMContentLoaded', init);
+    if (document.readyState === 'loading') {
+        window.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
 })();
