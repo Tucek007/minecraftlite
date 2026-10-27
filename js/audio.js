@@ -308,6 +308,156 @@
             osc.start(t);
             osc.stop(t + 0.17);
         }
+
+        /**
+         * Item pickup sound (short, cheerful pop)
+         */
+        playPickup() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(420, t);
+            osc.frequency.exponentialRampToValueAtTime(920, t + 0.07);
+
+            gain.gain.setValueAtTime(0.25, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.07);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(t);
+            osc.stop(t + 0.075);
+        }
+
+        /**
+         * Crafting sound (pleasant two-tone chime)
+         */
+        playCraft() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(330, t);
+            osc.frequency.setValueAtTime(495, t + 0.07);
+
+            gain.gain.setValueAtTime(0.25, t);
+            gain.gain.setValueAtTime(0.25, t + 0.07);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.14);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(t);
+            osc.stop(t + 0.15);
+        }
+
+        /**
+         * Procedural mob hurt sound
+         */
+        playMobHurt(mobType = 'pig') {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+
+            const t = this.ctx.currentTime;
+            const type = (mobType || 'pig').toLowerCase();
+
+            if (type === 'creeper') {
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = this.createNoiseBuffer(0.18);
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'bandpass';
+                filter.frequency.setValueAtTime(2800, t);
+                filter.frequency.exponentialRampToValueAtTime(1400, t + 0.16);
+                filter.Q.setValueAtTime(3.0, t);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.35, t);
+                gain.gain.exponentialRampToValueAtTime(0.01, t + 0.17);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+
+                noise.start(t);
+                noise.stop(t + 0.18);
+                return;
+            }
+
+            const osc = this.ctx.createOscillator();
+            const oscGain = this.ctx.createGain();
+
+            let oscType = 'triangle';
+            let startFreq = 220;
+            let endFreq = 110;
+            let duration = 0.16;
+            let noiseFreq = 800;
+            let noiseGainLevel = 0.18;
+
+            if (type === 'pig') {
+                oscType = 'sawtooth';
+                startFreq = 480;
+                endFreq = 620;
+                duration = 0.14;
+                noiseFreq = 1600;
+                noiseGainLevel = 0.2;
+            } else if (type === 'sheep') {
+                oscType = 'sawtooth';
+                startFreq = 280;
+                endFreq = 180;
+                duration = 0.18;
+                noiseFreq = 900;
+                noiseGainLevel = 0.15;
+            } else if (type === 'zombie') {
+                oscType = 'sawtooth';
+                startFreq = 115;
+                endFreq = 55;
+                duration = 0.24;
+                noiseFreq = 350;
+                noiseGainLevel = 0.25;
+            }
+
+            osc.type = oscType;
+            osc.frequency.setValueAtTime(startFreq, t);
+            osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), t + duration);
+
+            oscGain.gain.setValueAtTime(0.32, t);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, t + duration);
+
+            osc.connect(oscGain);
+            oscGain.connect(this.ctx.destination);
+
+            osc.start(t);
+            osc.stop(t + duration + 0.01);
+
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = this.createNoiseBuffer(duration);
+
+            const nFilter = this.ctx.createBiquadFilter();
+            nFilter.type = 'bandpass';
+            nFilter.frequency.setValueAtTime(noiseFreq, t);
+            nFilter.frequency.exponentialRampToValueAtTime(Math.max(60, noiseFreq * 0.5), t + duration);
+            nFilter.Q.setValueAtTime(2.0, t);
+
+            const nGain = this.ctx.createGain();
+            nGain.gain.setValueAtTime(noiseGainLevel, t);
+            nGain.gain.exponentialRampToValueAtTime(0.01, t + duration);
+
+            noise.connect(nFilter);
+            nFilter.connect(nGain);
+            nGain.connect(this.ctx.destination);
+
+            noise.start(t);
+            noise.stop(t + duration);
+        }
     }
 
     return SoundFX;

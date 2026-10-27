@@ -35,15 +35,37 @@
             this.yaw = 0;
             this.sensitivity = 0.0022;
 
+            // FOV settings and dynamic sprint/fly interpolation
+            this.baseFov = 75;
+            this.currentFov = 75;
+
             this.onGround = false;
             this.isSneaking = false;
             this.isFlying = false;
             this.isSprinting = false;
 
-            // Health and fall damage
+            // Game modes: 'survival', 'peaceful', 'creative'
+            this.gameMode = 'survival';
+
+            // Double-tap Space detection for flying
+            this.lastSpacePressTime = 0;
+
+            // Third-person camera (0: 1st person, 1: 3rd person back, 2: 3rd person front)
+            this.cameraMode = 0;
+            this.eyePosition = { x: this.position.x, y: this.position.y + this.normalEyeHeight, z: this.position.z };
+
+            // Health, fall distance, and contact hazards
             this.maxHealth = 20;
             this.health = 20;
             this.fallDistance = 0;
+            this.contactDamageCooldown = 0;
+
+            // Underwater oxygen, drowning, and health regeneration
+            this.maxOxygen = 15.0;
+            this.oxygen = 15.0;
+            this.drownTimer = 0;
+            this.timeSinceLastDamage = 0;
+            this.regenTimer = 0;
 
             this.reachDistance = 5.5;
             this.targetBlock = null;
@@ -81,8 +103,17 @@
                 } else if (e.deltaY < 0) {
                     this.selectedSlot = (this.selectedSlot - 1 + 9) % 9;
                 }
-                if (window.UI) window.UI.updateActiveSlot(this.selectedSlot);
+                const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
+                if (UI && typeof UI.updateActiveSlot === 'function') UI.updateActiveSlot(this.selectedSlot);
             }, { passive: true });
+
+            // Middle mouse click: Pick block
+            window.addEventListener('mousedown', (e) => {
+                if (e.button === 1 && this.isLocked) {
+                    if (typeof e.preventDefault === 'function') e.preventDefault();
+                    this.pickBlock();
+                }
+            });
         }
 
         lock() {
@@ -106,16 +137,91 @@
             }
         }
 
+        setGameMode(mode) {
+            if (!['survival', 'peaceful', 'creative'].includes(mode)) return;
+            this.gameMode = mode;
+
+            if (mode === 'creative') {
+                this.isFlying = true;
+                this.velocity.y = 0;
+                this.health = this.maxHealth;
+                this.oxygen = this.maxOxygen;
+            } else if (mode === 'survival') {
+                this.isFlying = false;
+            } else if (mode === 'peaceful') {
+                this.health = this.maxHealth;
+                this.oxygen = this.maxOxygen;
+            }
+
+            const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
+            if (UI) {
+                if (typeof UI.updateGameMode === 'function') {
+                    UI.updateGameMode(this.gameMode);
+                }
+                if (typeof UI.updateHealth === 'function') {
+                    UI.updateHealth(this.health);
+                }
+                if (typeof UI.updateOxygen === 'function') {
+                    UI.updateOxygen(this.oxygen, this.maxOxygen);
+                }
+                if (typeof UI.showToast === 'function') {
+                    let toast = 'Režim: Survival';
+                    if (mode === 'peaceful') toast = 'Režim: Klidný (Crafting / Bez boje)';
+                    else if (mode === 'creative') toast = 'Režim: Kreativní';
+                    UI.showToast(toast);
+                }
+            }
+        }
+
+        cycleGameMode() {
+            const modes = ['survival', 'peaceful', 'creative'];
+            const idx = modes.indexOf(this.gameMode);
+            const nextMode = modes[(idx + 1) % modes.length];
+            this.setGameMode(nextMode);
+        }
+
         onKeyDown(e) {
             this.keys[e.code] = true;
             const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
+
+            // Double-tap Space detection to toggle flying
+            if (e.code === 'Space' && !e.repeat) {
+                const now = (typeof performance !== 'undefined' && typeof performance.now === 'function') ? performance.now() : Date.now();
+                if (now - this.lastSpacePressTime > 20 && now - this.lastSpacePressTime < 320) {
+                    this.isFlying = !this.isFlying;
+                    this.velocity.y = 0;
+                    if (UI && typeof UI.showToast === 'function') {
+                        UI.showToast(this.isFlying ? 'Creative Flying: ON' : 'Flying: OFF');
+                    }
+                    this.lastSpacePressTime = 0;
+                } else {
+                    this.lastSpacePressTime = now;
+                }
+            }
+
+            // Switch game modes: 'G' key
+            if (e.code === 'KeyG') {
+                this.cycleGameMode();
+            }
+
+            // Third-person camera view toggle: F5
+            if (e.code === 'F5') {
+                if (typeof e.preventDefault === 'function') e.preventDefault();
+                this.cameraMode = (this.cameraMode + 1) % 3;
+                let toast = 'Pohled: 1. osoba';
+                if (this.cameraMode === 1) toast = 'Pohled: 3. osoba (zezadu)';
+                else if (this.cameraMode === 2) toast = 'Pohled: 3. osoba (zepředu)';
+                if (UI && typeof UI.showToast === 'function') {
+                    UI.showToast(toast);
+                }
+            }
 
             // Hotbar keys 1-9
             if (e.code.startsWith('Digit') && e.code.length === 6) {
                 const num = parseInt(e.code[5], 10);
                 if (num >= 1 && num <= 9) {
                     this.selectedSlot = num - 1;
-                    if (UI) UI.updateActiveSlot(this.selectedSlot);
+                    if (UI && typeof UI.updateActiveSlot === 'function') UI.updateActiveSlot(this.selectedSlot);
                 }
             }
 
@@ -123,13 +229,13 @@
             if (e.code === 'KeyF') {
                 this.isFlying = !this.isFlying;
                 this.velocity.y = 0;
-                if (UI) UI.showToast(this.isFlying ? 'Creative Flying: ON' : 'Survival Mode: ON');
+                if (UI && typeof UI.showToast === 'function') UI.showToast(this.isFlying ? 'Creative Flying: ON' : 'Survival Mode: ON');
             }
 
             // Debug screen toggle: F3
             if (e.code === 'F3') {
                 if (typeof e.preventDefault === 'function') e.preventDefault();
-                if (UI) UI.toggleDebug();
+                if (UI && typeof UI.toggleDebug === 'function') UI.toggleDebug();
             }
 
             // Creative inventory overlay toggle: 'E'
@@ -162,6 +268,10 @@
         update(dt) {
             // Cap delta time to prevent physics tunneling on lag spikes
             const delta = Math.min(0.1, dt);
+
+            if (this.contactDamageCooldown > 0) {
+                this.contactDamageCooldown -= delta;
+            }
 
             this.isSneaking = !!(this.keys['ShiftLeft'] || this.keys['ShiftRight']);
             this.isSprinting = !!(this.keys['ControlLeft'] || this.keys['ControlRight']);
@@ -222,6 +332,19 @@
 
             this.velocity.x += (targetVx - this.velocity.x) * Math.min(1.0, accel * delta);
             this.velocity.z += (targetVz - this.velocity.z) * Math.min(1.0, accel * delta);
+
+            // Dynamic FOV interpolation (Sprint & Fly FOV boost)
+            const hSpeed = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.z * this.velocity.z);
+            let fovBoost = 0;
+            if (this.isFlying) fovBoost += 6;
+            if (this.isSprinting && hSpeed > 1.0) fovBoost += 8;
+            this.currentFov += ((this.baseFov + fovBoost) - this.currentFov) * Math.min(1.0, delta * 10);
+            if (this.camera && typeof this.camera.updateProjectionMatrix === 'function') {
+                if (this.camera.fov === undefined || Math.abs(this.camera.fov - this.currentFov) > 0.05) {
+                    this.camera.fov = this.currentFov;
+                    this.camera.updateProjectionMatrix();
+                }
+            }
 
             // Vertical movement
             if (this.isFlying) {
@@ -287,7 +410,7 @@
                 this.onGround = result.onGround;
 
                 // Check landing for fall damage
-                if (!wasGroundedBefore && this.onGround && !this.isFlying && !inWater) {
+                if (!wasGroundedBefore && this.onGround && !this.isFlying && !inWater && this.gameMode !== 'creative') {
                     if (this.fallDistance > 3.0) {
                         const damage = Math.floor(this.fallDistance - 3.0);
                         if (damage > 0) {
@@ -309,6 +432,89 @@
                 this.position.z += displacement.z;
             }
 
+            // Contact damage check (e.g. Cactus hazard)
+            if (!this.isFlying && this.gameMode !== 'creative' && this.contactDamageCooldown <= 0 && this.world) {
+                const halfW = this.width / 2 + 0.05;
+                const minBx = Math.floor(this.position.x - halfW);
+                const maxBx = Math.floor(this.position.x + halfW);
+                const minBz = Math.floor(this.position.z - halfW);
+                const maxBz = Math.floor(this.position.z + halfW);
+                const y0 = Math.floor(this.position.y);
+                const y1 = Math.floor(this.position.y + 0.9);
+                const yLevels = (y0 === y1) ? [y0] : [y0, y1];
+
+                const B = Blocks || (g && g.Blocks);
+                let contactedHazard = false;
+                let hazardDamage = 1;
+
+                for (let bx = minBx; bx <= maxBx && !contactedHazard; bx++) {
+                    for (let bz = minBz; bz <= maxBz && !contactedHazard; bz++) {
+                        for (const by of yLevels) {
+                            const bId = this.world.getBlock(bx, by, bz);
+                            if (bId) {
+                                const bDef = B && B.BLOCK_DEFS && B.BLOCK_DEFS[bId];
+                                if ((bDef && bDef.damageOnContact) || bId === 23) {
+                                    contactedHazard = true;
+                                    hazardDamage = (bDef && typeof bDef.contactDamage === 'number') ? bDef.contactDamage : 1;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (contactedHazard) {
+                    this.takeDamage(hazardDamage);
+                    this.contactDamageCooldown = 0.6;
+                }
+            }
+
+            // Underwater oxygen and drowning
+            const headY = this.position.y + this.currentEyeHeight;
+            const headInWater = Boolean(this.world && (
+                typeof this.world.isWater === 'function' ?
+                    this.world.isWater(this.position.x, headY, this.position.z) :
+                    (typeof this.world.getBlock === 'function' && this.world.getBlock(Math.floor(this.position.x), Math.floor(headY), Math.floor(this.position.z)) === 11)
+            ));
+
+            if (headInWater && !this.isFlying && this.gameMode !== 'creative') {
+                this.oxygen = Math.max(0, this.oxygen - delta);
+                if (this.oxygen <= 0) {
+                    this.drownTimer += delta;
+                    if (this.drownTimer >= 1.0) {
+                        this.drownTimer -= 1.0;
+                        if (this.gameMode !== 'peaceful') {
+                            this.takeDamage(2);
+                        }
+                    }
+                }
+            } else {
+                this.oxygen = Math.min(this.maxOxygen, this.oxygen + delta * 5.0);
+                this.drownTimer = 0;
+            }
+
+            const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
+            if (UI && typeof UI.updateOxygen === 'function') {
+                UI.updateOxygen(this.oxygen, this.maxOxygen);
+            }
+
+            // Health regeneration
+            this.timeSinceLastDamage += delta;
+            if (this.health > 0 && this.health < this.maxHealth) {
+                const delayReq = (this.gameMode === 'peaceful') ? 1.5 : 4.0;
+                const intervalReq = (this.gameMode === 'peaceful') ? 1.0 : 2.5;
+                if (this.timeSinceLastDamage >= delayReq) {
+                    this.regenTimer += delta;
+                    if (this.regenTimer >= intervalReq) {
+                        this.regenTimer = 0;
+                        this.health = Math.min(this.maxHealth, this.health + 1);
+                        if (UI && typeof UI.updateHealth === 'function') {
+                            UI.updateHealth(this.health);
+                        }
+                    }
+                }
+            }
+
             // Void recovery
             if (this.position.y < -10) {
                 const spawn = this.getSafeSpawnPosition(8.5, 8.5);
@@ -320,7 +526,6 @@
                 this.velocity.z = 0;
                 this.fallDistance = 0;
                 this.onGround = true;
-                const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
                 if (UI && typeof UI.showToast === 'function') {
                     UI.showToast('Respawned above surface!');
                 }
@@ -349,17 +554,63 @@
                 }
             }
 
+            // Eye position calculation
+            const eyeX = this.position.x;
+            const eyeY = this.position.y + this.currentEyeHeight + bobY;
+            const eyeZ = this.position.z;
+            this.eyePosition = { x: eyeX, y: eyeY, z: eyeZ };
+
             // Sync camera position and rotation
             if (this.camera && this.camera.position) {
-                this.camera.position.x = this.position.x;
-                this.camera.position.y = this.position.y + this.currentEyeHeight + bobY;
-                this.camera.position.z = this.position.z;
+                if (this.cameraMode === 0) {
+                    this.camera.position.x = eyeX;
+                    this.camera.position.y = eyeY;
+                    this.camera.position.z = eyeZ;
 
-                if (this.camera.rotation) {
-                    this.camera.rotation.order = 'YXZ';
-                    this.camera.rotation.x = this.pitch;
-                    this.camera.rotation.y = this.yaw;
-                    this.camera.rotation.z = 0;
+                    if (this.camera.rotation) {
+                        this.camera.rotation.order = 'YXZ';
+                        this.camera.rotation.x = this.pitch;
+                        this.camera.rotation.y = this.yaw;
+                        this.camera.rotation.z = 0;
+                    }
+                } else {
+                    const lookDir = this.getLookDirection();
+                    const dirSign = (this.cameraMode === 1) ? -1 : 1;
+                    let dist = 3.6;
+
+                    if (Phys && typeof Phys.raycastVoxel === 'function' && this.world) {
+                        const camRayDir = {
+                            x: lookDir.x * dirSign,
+                            y: lookDir.y * dirSign,
+                            z: lookDir.z * dirSign
+                        };
+                        const hit = Phys.raycastVoxel(
+                            { x: eyeX, y: eyeY, z: eyeZ },
+                            camRayDir,
+                            3.6,
+                            (x, y, z) => this.world.isSolid(x, y, z)
+                        );
+                        if (hit && hit.hit) {
+                            dist = Math.max(0.4, hit.distance - 0.3);
+                        }
+                    }
+
+                    this.camera.position.x = eyeX + lookDir.x * dirSign * dist;
+                    this.camera.position.y = eyeY + lookDir.y * dirSign * dist;
+                    this.camera.position.z = eyeZ + lookDir.z * dirSign * dist;
+
+                    if (this.camera.rotation) {
+                        this.camera.rotation.order = 'YXZ';
+                        if (this.cameraMode === 1) {
+                            this.camera.rotation.x = this.pitch;
+                            this.camera.rotation.y = this.yaw;
+                            this.camera.rotation.z = 0;
+                        } else {
+                            this.camera.rotation.x = -this.pitch;
+                            this.camera.rotation.y = this.yaw + Math.PI;
+                            this.camera.rotation.z = 0;
+                        }
+                    }
                 }
             }
 
@@ -384,11 +635,20 @@
             const Phys = Physics || (g && g.Physics) || (typeof require !== 'undefined' ? require('./physics') : null);
             if (!Phys || !this.world) return;
 
-            const eyePos = {
-                x: (this.camera && this.camera.position && this.camera.position.x !== undefined) ? this.camera.position.x : this.position.x,
-                y: (this.camera && this.camera.position && this.camera.position.y !== undefined) ? this.camera.position.y : (this.position.y + this.currentEyeHeight),
-                z: (this.camera && this.camera.position && this.camera.position.z !== undefined) ? this.camera.position.z : this.position.z
-            };
+            let eyePos;
+            if (this.cameraMode === 0) {
+                eyePos = {
+                    x: (this.camera && this.camera.position && this.camera.position.x !== undefined) ? this.camera.position.x : this.position.x,
+                    y: (this.camera && this.camera.position && this.camera.position.y !== undefined) ? this.camera.position.y : (this.position.y + this.currentEyeHeight),
+                    z: (this.camera && this.camera.position && this.camera.position.z !== undefined) ? this.camera.position.z : this.position.z
+                };
+            } else {
+                eyePos = this.eyePosition || {
+                    x: this.position.x,
+                    y: this.position.y + this.currentEyeHeight,
+                    z: this.position.z
+                };
+            }
             const lookDir = this.getLookDirection();
 
             this.targetBlock = Phys.raycastVoxel(
@@ -397,6 +657,38 @@
                 this.reachDistance,
                 (x, y, z) => this.world.isSolid(x, y, z)
             );
+        }
+
+        /**
+         * Pick block under crosshair and set into active hotbar slot (or switch to it)
+         */
+        pickBlock() {
+            if (!this.targetBlock || !this.targetBlock.hit || !this.world) return false;
+
+            const pos = this.targetBlock.blockPos;
+            const blockId = this.world.getBlock(pos.x, pos.y, pos.z);
+
+            // Ignore AIR (0), WATER (11), and BEDROCK (14)
+            if (blockId === 0 || blockId === 11 || blockId === 14) return false;
+
+            const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
+            if (UI) {
+                if (Array.isArray(UI.hotbarBlocks)) {
+                    const existingIdx = UI.hotbarBlocks.indexOf(blockId);
+                    if (existingIdx >= 0) {
+                        this.selectedSlot = existingIdx;
+                        if (typeof UI.updateActiveSlot === 'function') {
+                            UI.updateActiveSlot(this.selectedSlot);
+                        }
+                        return true;
+                    }
+                }
+                if (typeof UI.setHotbarBlock === 'function') {
+                    UI.setHotbarBlock(this.selectedSlot, blockId);
+                    return true;
+                }
+            }
+            return true;
         }
 
         /**
@@ -421,7 +713,9 @@
         }
 
         takeDamage(amount) {
-            if (this.isFlying) return;
+            if (this.isFlying || this.gameMode === 'creative') return;
+            this.timeSinceLastDamage = 0;
+            this.regenTimer = 0;
             this.health = Math.max(0, this.health - amount);
             if (this.audio && typeof this.audio.playHurt === 'function') {
                 this.audio.playHurt();
@@ -464,6 +758,10 @@
 
         respawn() {
             this.health = this.maxHealth;
+            this.oxygen = this.maxOxygen;
+            this.drownTimer = 0;
+            this.timeSinceLastDamage = 0;
+            this.regenTimer = 0;
             const spawn = this.getSafeSpawnPosition(8.5, 8.5);
             this.position.x = spawn.x;
             this.position.y = spawn.y;
@@ -476,6 +774,9 @@
             const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
             if (UI && typeof UI.updateHealth === 'function') {
                 UI.updateHealth(this.health);
+            }
+            if (UI && typeof UI.updateOxygen === 'function') {
+                UI.updateOxygen(this.oxygen, this.maxOxygen);
             }
         }
     }

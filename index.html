@@ -10,6 +10,7 @@
 <body>
     <!-- 3D Canvas Container -->
     <div id="game-container"></div>
+    <div id="underwater-overlay"></div>
 
     <!-- Center Crosshair -->
     <div id="crosshair"></div>
@@ -22,7 +23,20 @@
 
     <!-- In-Game HUD -->
     <div id="hud">
+        <div id="mode-indicator">SURVIVAL</div>
         <div id="block-prompt">Grass Block</div>
+        <div id="bubbles-bar" style="display: none;">
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+            <div class="bubble"></div>
+        </div>
         <div id="hearts-bar">
             <div class="heart"></div>
             <div class="heart"></div>
@@ -43,10 +57,23 @@
         <div class="inventory-box">
             <div class="inventory-header">
                 <span class="inventory-title">Creative Inventory</span>
-                <button type="button" id="btn-inventory-close" class="inventory-close-btn">&times;</button>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button type="button" id="btn-inv-gamemode" class="mc-btn small-btn">Režim: Survival</button>
+                    <button type="button" id="btn-inventory-close" class="inventory-close-btn">&times;</button>
+                </div>
             </div>
-            <div class="inventory-subtitle">Click a block to put in current hotbar slot, or hover and press 1-9. Press 'E' or Esc to close.</div>
+            <div class="inventory-subtitle">Inventář všech bloků. Click a block to put in current hotbar slot, or hover and press 1-9. Press 'E' or Esc to close.</div>
+            <div id="crafting-section" class="crafting-section">
+                <div class="crafting-header">Crafting (Výroba předmětů) <span id="crafting-mode-hint" class="crafting-hint">V Klidném/Kreativním režimu lze kraftit zdarma bez surovin!</span></div>
+                <div id="crafting-grid" class="crafting-grid"></div>
+            </div>
             <div id="inventory-grid" class="inventory-grid"></div>
+            <div class="inventory-controls" style="margin-top: 10px; font-size: 11px; color: #888; display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;">
+                <div><span class="key-badge">G</span> : Přepnout režim (Survival / Klidný Crafting / Kreativní)</div>
+                <div><span class="key-badge">F5</span> : Pohled 3. osoby</div>
+                <div><span class="key-badge">Ctrl</span> : Sprint (Sprint)</div>
+                <div><span class="key-badge">Střední tl. myši</span> : Vybrat blok pod kurzorem (Pick Block)</div>
+            </div>
         </div>
     </div>
 
@@ -57,18 +84,38 @@
             <div class="menu-subtitle">3D Procedural Voxel Engine &bull; WebGL</div>
             <div class="menu-buttons">
                 <button type="button" id="btn-resume" class="mc-btn primary">Click to Play / Resume</button>
+                <button type="button" id="btn-gamemode" class="mc-btn">Režim hry: Survival</button>
                 <button type="button" id="btn-save" class="mc-btn">Save World</button>
                 <button type="button" id="btn-load" class="mc-btn">Load World</button>
                 <button type="button" id="btn-reset" class="mc-btn">Generate New World</button>
             </div>
+            <div class="settings-card">
+                <div class="setting-row">
+                    <label for="setting-fov">Zorné pole (FOV): <span id="val-fov">75°</span></label>
+                    <input type="range" id="setting-fov" min="60" max="110" step="1" value="75">
+                </div>
+                <div class="setting-row">
+                    <label for="setting-sens">Citlivost (Sens): <span id="val-sens">100%</span></label>
+                    <input type="range" id="setting-sens" min="5" max="50" step="1" value="22">
+                </div>
+                <div class="setting-row">
+                    <label for="setting-dist">Vykreslování (Dist): <span id="val-dist">3 chunks</span></label>
+                    <input type="range" id="setting-dist" min="2" max="6" step="1" value="3">
+                </div>
+            </div>
             <div class="controls-card">
                 <div><span class="key-badge">W</span> <span class="key-badge">A</span> <span class="key-badge">S</span> <span class="key-badge">D</span> : Pohyb (Move)</div>
+                <div><span class="key-badge">Ctrl</span> : Sprint (Sprint)</div>
                 <div><span class="key-badge">Mezerník</span> : Skok / Let nahoru (Jump)</div>
+                <div><span class="key-badge">2x Mezerník</span> : Přepnout létání (Double-Jump Fly)</div>
                 <div><span class="key-badge">Shift</span> : Plížení / Let dolů (Sneak)</div>
+                <div><span class="key-badge">G</span> : Přepnout herní režim (Survival / Bez boje & Crafting / Kreativní)</div>
                 <div><span class="key-badge">F</span> : Přepnout Creative Létání (Fly Mode)</div>
-                <div><span class="key-badge">E</span> : Inventář všech 20 bloků (Creative Inventory)</div>
+                <div><span class="key-badge">F5</span> : Přepnout kameru 1. / 3. osoby (Postava Steve)</div>
+                <div><span class="key-badge">E</span> : Inventář všech bloků (Creative Inventory)</div>
                 <div><span class="key-badge">Levé tl. myši</span> : Těžit blok (Hold to dig)</div>
                 <div><span class="key-badge">Pravé tl. myši</span> : Položit / Zapálit TNT (Place / Ignite)</div>
+                <div><span class="key-badge">Střední tl. myši</span> : Vybrat blok pod kurzorem (Pick Block)</div>
                 <div><span class="key-badge">1</span> - <span class="key-badge">9</span> / <span class="key-badge">Kolečko</span> : Výběr bloku (Select)</div>
                 <div><span class="key-badge">F3</span> : Debug info & souřadnice (Debug)</div>
                 <div><span class="key-badge">Esc</span> : Pozastavit / Menu (Pause)</div>
@@ -84,6 +131,7 @@
     <script src="js/world.js"></script>
     <script src="js/audio.js"></script>
     <script src="js/player.js"></script>
+    <script src="js/mobs.js"></script>
     <script src="js/ui.js"></script>
     <script src="js/main.js"></script>
 </body>

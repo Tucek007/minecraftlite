@@ -32,7 +32,17 @@
         OBSIDIAN: 17,
         GOLD_ORE: 18,
         DIAMOND_ORE: 19,
-        SNOW: 20
+        SNOW: 20,
+        GLOWSTONE: 21,
+        MOSSY_COBBLESTONE: 22,
+        CACTUS: 23,
+        PUMPKIN: 24,
+        GRAVEL: 25,
+        CRAFTING_TABLE: 26,
+        JACK_O_LANTERN: 27,
+        BIRCH_WOOD: 28,
+        BIRCH_LEAVES: 29,
+        LAVA: 30
     };
 
     // Texture tile coordinates in 16x16 grid (index = tileY * 16 + tileX)
@@ -62,7 +72,33 @@
         GOLD_ORE: 22,
         DIAMOND_ORE: 23,
         SNOW_TOP: 24,
-        SNOW_SIDE: 25
+        SNOW_SIDE: 25,
+        GLOWSTONE: 26,
+        MOSSY_COBBLESTONE: 27,
+        CACTUS_SIDE: 28,
+        CACTUS_TOP: 29,
+        PUMPKIN_TOP: 30,
+        PUMPKIN_SIDE: 31,
+        PUMPKIN_FRONT: 32,
+        GRAVEL: 33,
+        CRAFTING_TOP: 34,
+        CRAFTING_SIDE: 35,
+        CRAFTING_FRONT: 36,
+        JACK_O_LANTERN_FRONT: 37,
+        BIRCH_SIDE: 38,
+        BIRCH_TOP: 39,
+        BIRCH_LEAVES: 40,
+        LAVA: 41,
+        CRACK_0: 240,
+        CRACK_1: 241,
+        CRACK_2: 242,
+        CRACK_3: 243,
+        CRACK_4: 244,
+        CRACK_5: 245,
+        CRACK_6: 246,
+        CRACK_7: 247,
+        CRACK_8: 248,
+        CRACK_9: 249
     };
 
     const BLOCK_DEFS = {
@@ -72,6 +108,7 @@
             solid: false,
             transparent: true,
             liquid: false,
+            hardness: 0,
             sound: 'none'
         },
         [BLOCKS.GRASS]: {
@@ -80,6 +117,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 0.45,
             sound: 'grass',
             textures: {
                 top: TILES.GRASS_TOP,
@@ -93,6 +131,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 0.4,
             sound: 'grass',
             textures: {
                 all: TILES.DIRT
@@ -104,6 +143,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 1.1,
             sound: 'stone',
             textures: {
                 all: TILES.STONE
@@ -115,6 +155,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 1.2,
             sound: 'stone',
             textures: {
                 all: TILES.COBBLESTONE
@@ -126,6 +167,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 0.85,
             sound: 'wood',
             textures: {
                 top: TILES.WOOD_TOP,
@@ -139,6 +181,7 @@
             solid: true,
             transparent: true,
             liquid: false,
+            hardness: 0.2,
             sound: 'grass',
             textures: {
                 all: TILES.LEAVES
@@ -150,6 +193,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 0.8,
             sound: 'wood',
             textures: {
                 all: TILES.PLANKS
@@ -161,6 +205,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 1.3,
             sound: 'stone',
             textures: {
                 all: TILES.BRICK
@@ -172,6 +217,8 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 0.4,
+            gravity: true,
             sound: 'sand',
             textures: {
                 all: TILES.SAND
@@ -183,6 +230,7 @@
             solid: true,
             transparent: true,
             liquid: false,
+            hardness: 0.25,
             sound: 'glass',
             textures: {
                 all: TILES.GLASS
@@ -194,6 +242,7 @@
             solid: false,
             transparent: true,
             liquid: true,
+            hardness: 0,
             sound: 'water',
             textures: {
                 all: TILES.WATER
@@ -205,6 +254,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 1.4,
             sound: 'stone',
             textures: {
                 all: TILES.COAL_ORE
@@ -216,6 +266,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 1.6,
             sound: 'stone',
             textures: {
                 all: TILES.IRON_ORE
@@ -228,6 +279,7 @@
             transparent: false,
             liquid: false,
             unbreakable: true,
+            hardness: Infinity,
             sound: 'stone',
             textures: {
                 all: TILES.BEDROCK
@@ -239,6 +291,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 0.25,
             sound: 'grass',
             textures: {
                 top: TILES.TNT_TOP,
@@ -252,6 +305,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 0.75,
             sound: 'wood',
             textures: {
                 top: TILES.PLANKS,
@@ -265,6 +319,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 3.2,
             sound: 'stone',
             textures: {
                 all: TILES.OBSIDIAN
@@ -276,6 +331,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 1.8,
             sound: 'stone',
             textures: {
                 all: TILES.GOLD_ORE
@@ -287,6 +343,7 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 2.0,
             sound: 'stone',
             textures: {
                 all: TILES.DIAMOND_ORE
@@ -298,11 +355,153 @@
             solid: true,
             transparent: false,
             liquid: false,
+            hardness: 0.3,
             sound: 'grass',
             textures: {
                 top: TILES.SNOW_TOP,
                 bottom: TILES.DIRT,
                 sides: TILES.SNOW_SIDE
+            }
+        },
+        [BLOCKS.GLOWSTONE]: {
+            id: BLOCKS.GLOWSTONE,
+            name: 'Glowstone',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            lightLevel: 15,
+            hardness: 0.45,
+            sound: 'glass',
+            textures: {
+                all: TILES.GLOWSTONE
+            }
+        },
+        [BLOCKS.MOSSY_COBBLESTONE]: {
+            id: BLOCKS.MOSSY_COBBLESTONE,
+            name: 'Mossy Cobblestone',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            hardness: 1.2,
+            sound: 'stone',
+            textures: {
+                all: TILES.MOSSY_COBBLESTONE
+            }
+        },
+        [BLOCKS.CACTUS]: {
+            id: BLOCKS.CACTUS,
+            name: 'Cactus',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            hardness: 0.4,
+            damageOnContact: true,
+            sound: 'grass',
+            textures: {
+                top: TILES.CACTUS_TOP,
+                bottom: TILES.CACTUS_TOP,
+                sides: TILES.CACTUS_SIDE
+            }
+        },
+        [BLOCKS.PUMPKIN]: {
+            id: BLOCKS.PUMPKIN,
+            name: 'Pumpkin',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            hardness: 0.6,
+            sound: 'wood',
+            textures: {
+                top: TILES.PUMPKIN_TOP,
+                bottom: TILES.PUMPKIN_TOP,
+                front: TILES.PUMPKIN_FRONT,
+                sides: TILES.PUMPKIN_SIDE
+            }
+        },
+        [BLOCKS.GRAVEL]: {
+            id: BLOCKS.GRAVEL,
+            name: 'Gravel',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            hardness: 0.45,
+            gravity: true,
+            sound: 'sand',
+            textures: {
+                all: TILES.GRAVEL
+            }
+        },
+        [BLOCKS.CRAFTING_TABLE]: {
+            id: BLOCKS.CRAFTING_TABLE,
+            name: 'Crafting Table',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            hardness: 0.85,
+            interactive: true,
+            sound: 'wood',
+            textures: {
+                top: TILES.CRAFTING_TOP,
+                bottom: TILES.PLANKS,
+                front: TILES.CRAFTING_FRONT,
+                sides: TILES.CRAFTING_SIDE
+            }
+        },
+        [BLOCKS.JACK_O_LANTERN]: {
+            id: BLOCKS.JACK_O_LANTERN,
+            name: "Jack o'Lantern",
+            solid: true,
+            transparent: false,
+            liquid: false,
+            lightLevel: 15,
+            hardness: 0.6,
+            sound: 'wood',
+            textures: {
+                top: TILES.PUMPKIN_TOP,
+                bottom: TILES.PUMPKIN_TOP,
+                front: TILES.JACK_O_LANTERN_FRONT,
+                sides: TILES.PUMPKIN_SIDE
+            }
+        },
+        [BLOCKS.BIRCH_WOOD]: {
+            id: BLOCKS.BIRCH_WOOD,
+            name: 'Birch Wood Log',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            hardness: 0.85,
+            sound: 'wood',
+            textures: {
+                top: TILES.BIRCH_TOP,
+                bottom: TILES.BIRCH_TOP,
+                sides: TILES.BIRCH_SIDE
+            }
+        },
+        [BLOCKS.BIRCH_LEAVES]: {
+            id: BLOCKS.BIRCH_LEAVES,
+            name: 'Birch Leaves',
+            solid: true,
+            transparent: true,
+            liquid: false,
+            hardness: 0.2,
+            sound: 'grass',
+            textures: {
+                all: TILES.BIRCH_LEAVES
+            }
+        },
+        [BLOCKS.LAVA]: {
+            id: BLOCKS.LAVA,
+            name: 'Lava',
+            solid: true,
+            transparent: false,
+            liquid: true,
+            lightLevel: 15,
+            hardness: 0.5,
+            damageOnContact: true,
+            contactDamage: 3,
+            sound: 'stone',
+            textures: {
+                all: TILES.LAVA
             }
         }
     };
@@ -315,6 +514,7 @@
         if (def.textures.all !== undefined) return def.textures.all;
         if (faceIndex === 2) return def.textures.top !== undefined ? def.textures.top : def.textures.sides;
         if (faceIndex === 3) return def.textures.bottom !== undefined ? def.textures.bottom : def.textures.sides;
+        if (faceIndex === 4 && def.textures.front !== undefined) return def.textures.front;
         return def.textures.sides;
     }
 
@@ -620,13 +820,515 @@
             }
         });
 
+        // 26. GLOWSTONE
+        fillTile(TILES.GLOWSTONE, (tx, ty, px, py) => {
+            const n = rnd();
+            if (n > 0.82) {
+                // Bright yellow-white crystal highlight
+                setPixel(tx, ty, px, py, 255, 250, 190 + Math.floor(rnd() * 50));
+            } else if (n > 0.5) {
+                // Golden amber
+                setPixel(tx, ty, px, py, 235 + Math.floor(n * 20), 180 + Math.floor(n * 40), 50 + Math.floor(n * 30));
+            } else if (n > 0.25) {
+                // Rich amber
+                setPixel(tx, ty, px, py, 210 + Math.floor(n * 25), 140 + Math.floor(n * 30), 30 + Math.floor(n * 20));
+            } else {
+                // Darker amber crevices
+                setPixel(tx, ty, px, py, 160 + Math.floor(n * 30), 100 + Math.floor(n * 25), 20 + Math.floor(n * 15));
+            }
+        });
+
+        // 27. MOSSY_COBBLESTONE
+        fillTile(TILES.MOSSY_COBBLESTONE, (tx, ty, px, py) => {
+            const isBorder = (px === 0 || px === 7 || px === 8 || px === 15 || py === 0 || py === 7 || py === 8 || py === 15);
+            const n = rnd();
+            const isMossy = (isBorder && rnd() > 0.35) || (rnd() > 0.78);
+            if (isMossy) {
+                // Green moss pixels along borders
+                const mossG = 110 + n * 45;
+                const mossR = 45 + n * 30;
+                const mossB = 25 + n * 25;
+                setPixel(tx, ty, px, py, mossR, mossG, mossB);
+            } else if (isBorder && rnd() > 0.4) {
+                setPixel(tx, ty, px, py, 60 + n * 20, 60 + n * 20, 60 + n * 20);
+            } else {
+                const shade = 100 + n * 45;
+                setPixel(tx, ty, px, py, shade, shade, shade);
+            }
+        });
+
+        // 28. CACTUS_SIDE
+        fillTile(TILES.CACTUS_SIDE, (tx, ty, px, py) => {
+            const isRib = (px % 4 === 0);
+            const isPrickle = ((px === 2 || px === 6 || px === 10 || px === 14) && (py % 4 === 2)) ||
+                              ((px === 0 || px === 4 || px === 8 || px === 12) && (py % 4 === 0));
+            const n = rnd();
+            if (isPrickle) {
+                if (rnd() > 0.4) {
+                    // Light prickle spike
+                    setPixel(tx, ty, px, py, 220, 235, 200);
+                } else {
+                    // Dark prickle base
+                    setPixel(tx, ty, px, py, 20, 45, 15);
+                }
+            } else if (isRib) {
+                // Darker vertical rib groove
+                setPixel(tx, ty, px, py, 28 + n * 15, 85 + n * 20, 18 + n * 10);
+            } else {
+                // Deep green cactus flesh
+                setPixel(tx, ty, px, py, 45 + n * 20, 115 + n * 30, 30 + n * 15);
+            }
+        });
+
+        // 29. CACTUS_TOP
+        fillTile(TILES.CACTUS_TOP, (tx, ty, px, py) => {
+            const dx = px - 7.5;
+            const dy = py - 7.5;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const n = rnd();
+            if (dist < 2.5) {
+                // Center lighter core
+                setPixel(tx, ty, px, py, 80 + n * 20, 145 + n * 25, 45 + n * 15);
+            } else if (dist < 5.0) {
+                // Darker concentric groove
+                setPixel(tx, ty, px, py, 35 + n * 15, 95 + n * 20, 25 + n * 10);
+            } else if (dist < 7.2) {
+                // Green flesh ring
+                setPixel(tx, ty, px, py, 55 + n * 20, 125 + n * 25, 35 + n * 15);
+            } else {
+                // Outer edge
+                setPixel(tx, ty, px, py, 30 + n * 15, 85 + n * 20, 20 + n * 10);
+            }
+        });
+
+        // 30. PUMPKIN_TOP
+        fillTile(TILES.PUMPKIN_TOP, (tx, ty, px, py) => {
+            const isStem = (px >= 7 && px <= 8 && py >= 7 && py <= 8);
+            const isStemBorder = (px >= 6 && px <= 9 && py >= 6 && py <= 9);
+            const isRib = (px === 3 || px === 12 || py === 3 || py === 12);
+            const n = rnd();
+            if (isStem) {
+                // Central stem
+                setPixel(tx, ty, px, py, 85 + n * 20, 95 + n * 20, 45 + n * 15);
+            } else if (isStemBorder) {
+                // Stem base depression
+                setPixel(tx, ty, px, py, 140 + n * 20, 75 + n * 15, 15 + n * 10);
+            } else if (isRib) {
+                // Rib groove
+                setPixel(tx, ty, px, py, 175 + n * 20, 95 + n * 15, 18 + n * 10);
+            } else {
+                // Orange ribbed flesh
+                setPixel(tx, ty, px, py, 215 + n * 25, 125 + n * 25, 25 + n * 15);
+            }
+        });
+
+        // 31. PUMPKIN_SIDE
+        fillTile(TILES.PUMPKIN_SIDE, (tx, ty, px, py) => {
+            const isGroove = (px % 4 === 0);
+            const n = rnd();
+            if (isGroove) {
+                setPixel(tx, ty, px, py, 170 + n * 20, 90 + n * 15, 18 + n * 10);
+            } else {
+                setPixel(tx, ty, px, py, 215 + n * 25, 125 + n * 25, 25 + n * 15);
+            }
+        });
+
+        // 32. PUMPKIN_FRONT
+        fillTile(TILES.PUMPKIN_FRONT, (tx, ty, px, py) => {
+            const isLeftEye = (py === 4 && (px === 3 || px === 4)) ||
+                              (py === 5 && (px >= 3 && px <= 5)) ||
+                              (py === 6 && px === 4);
+            const isRightEye = (py === 4 && (px === 11 || px === 12)) ||
+                               (py === 5 && (px >= 10 && px <= 12)) ||
+                               (py === 6 && px === 11);
+            const isNose = (py === 7 && (px === 7 || px === 8));
+            const isMouth = (py === 9 && (px === 2 || px === 5 || px === 10 || px === 13)) ||
+                            (py === 10 && ((px >= 2 && px <= 6) || (px >= 9 && px <= 13))) ||
+                            (py === 11 && (px === 3 || px === 4 || (px >= 6 && px <= 9) || px === 11 || px === 12)) ||
+                            (py === 12 && (px === 4 || px === 7 || px === 8 || px === 11));
+            const isCarved = isLeftEye || isRightEye || isNose || isMouth;
+
+            const n = rnd();
+            if (isCarved) {
+                // Carved dark/yellow eye and mouth pixels
+                if (rnd() > 0.45) {
+                    // Warm yellow glowing carving
+                    setPixel(tx, ty, px, py, 235 + n * 20, 175 + n * 20, 30 + n * 15);
+                } else {
+                    // Deep carved dark shading
+                    setPixel(tx, ty, px, py, 45 + n * 15, 25 + n * 10, 10 + n * 5);
+                }
+            } else {
+                // Normal pumpkin side texture with vertical grooves
+                const isGroove = (px % 4 === 0);
+                if (isGroove) {
+                    setPixel(tx, ty, px, py, 170 + n * 20, 90 + n * 15, 18 + n * 10);
+                } else {
+                    setPixel(tx, ty, px, py, 215 + n * 25, 125 + n * 25, 25 + n * 15);
+                }
+            }
+        });
+
+        // 33. GRAVEL (Pebbly grey/brown noise)
+        fillTile(TILES.GRAVEL, (tx, ty, px, py) => {
+            const n = rnd();
+            const isPebble = ((px % 4 === 1 || px % 4 === 2) && (py % 4 === 1 || py % 4 === 2)) && rnd() > 0.45;
+            if (isPebble) {
+                const shade = 80 + Math.floor(n * 30);
+                setPixel(tx, ty, px, py, shade + 10, shade + 3, shade - 5);
+            } else if (n > 0.7) {
+                const shade = 145 + Math.floor(n * 35);
+                setPixel(tx, ty, px, py, shade + 8, shade + 2, shade - 6);
+            } else {
+                const shade = 110 + Math.floor(n * 30);
+                setPixel(tx, ty, px, py, shade + 8, shade + 2, shade - 6);
+            }
+        });
+
+        // 34. CRAFTING_TOP (3x3 crafting grid lines on wood/cloth top)
+        fillTile(TILES.CRAFTING_TOP, (tx, ty, px, py) => {
+            const n = rnd();
+            const isOuter = (px <= 1 || px >= 14 || py <= 1 || py >= 14);
+            const isCorner = ((px <= 2 || px >= 13) && (py <= 2 || py >= 13));
+            const isInnerFrame = (px === 2 || px === 13 || py === 2 || py === 13);
+            const isGrid = (px >= 3 && px <= 12 && py >= 3 && py <= 12) && (px === 6 || px === 9 || py === 6 || py === 9);
+
+            if (isCorner) {
+                // Dark corner bracket / nail
+                setPixel(tx, ty, px, py, 95 + n * 15, 65 + n * 10, 35 + n * 10);
+            } else if (isOuter) {
+                // Outer wood frame
+                setPixel(tx, ty, px, py, 160 + n * 20, 115 + n * 15, 70 + n * 10);
+            } else if (isInnerFrame || isGrid) {
+                // Dark grid lines
+                setPixel(tx, ty, px, py, 110 + n * 15, 75 + n * 10, 40 + n * 10);
+            } else {
+                // Light workbench cloth / parchment surface
+                setPixel(tx, ty, px, py, 215 + n * 20, 185 + n * 15, 135 + n * 15);
+            }
+        });
+
+        // 35. CRAFTING_SIDE (Wood planks with dark top rim and tool silhouettes)
+        fillTile(TILES.CRAFTING_SIDE, (tx, ty, px, py) => {
+            const n = rnd();
+            const isTopRim = (py <= 1);
+            const isRimBottom = (py === 2);
+            // Tool silhouette 1: hanging shears (px 3..5, py 4..12)
+            const isTool1 = (px === 4 && py >= 4 && py <= 12) ||
+                            (px === 3 && (py === 5 || py === 7 || py === 9 || py === 11)) ||
+                            (px === 5 && (py === 4 || py === 12));
+            // Tool silhouette 2: hanging wrench / hammer (px 11..13, py 4..11)
+            const isTool2 = (px === 12 && py >= 5 && py <= 12) ||
+                            (py === 5 && px >= 10 && px <= 13) ||
+                            (py === 6 && (px === 10 || px === 13));
+
+            if (isTopRim) {
+                setPixel(tx, ty, px, py, 120 + n * 15, 85 + n * 10, 50 + n * 10);
+            } else if (isRimBottom) {
+                setPixel(tx, ty, px, py, 80 + n * 15, 55 + n * 10, 30 + n * 10);
+            } else if (isTool1 || isTool2) {
+                // Dark iron tool silhouette
+                setPixel(tx, ty, px, py, 45 + n * 20, 45 + n * 20, 50 + n * 20);
+            } else {
+                // Planks background
+                const isSeam = (py % 4 === 2) || (py < 6 && px === 8) || (py >= 6 && py < 10 && px === 2) || (py >= 10 && px === 10);
+                if (isSeam) {
+                    setPixel(tx, ty, px, py, 130 + n * 15, 95 + n * 10, 55 + n * 10);
+                } else {
+                    setPixel(tx, ty, px, py, 175 + n * 20, 135 + n * 15, 85 + n * 15);
+                }
+            }
+        });
+
+        // 36. CRAFTING_FRONT (Wood planks with saw/hammer grid details)
+        fillTile(TILES.CRAFTING_FRONT, (tx, ty, px, py) => {
+            const n = rnd();
+            const isTopRim = (py <= 1);
+            const isRimBottom = (py === 2);
+            // Diagonal saw blade (px from 3 to 11, py from 5 to 11)
+            const isSawBlade = (Math.abs((px - 3) - (py - 5)) <= 0 && px >= 3 && px <= 11);
+            const isSawTeeth = (isSawBlade || ((px === py - 1) && px >= 4 && px <= 10 && px % 2 === 0));
+            const isSawHandle = (px >= 11 && px <= 13 && py >= 11 && py <= 13);
+            const isHammerHead = (py === 4 && px >= 8 && px <= 13) || (py === 5 && px >= 9 && px <= 12);
+            const isHammerHandle = (px === 10 && py >= 6 && py <= 10);
+
+            if (isTopRim) {
+                setPixel(tx, ty, px, py, 120 + n * 15, 85 + n * 10, 50 + n * 10);
+            } else if (isRimBottom) {
+                setPixel(tx, ty, px, py, 80 + n * 15, 55 + n * 10, 30 + n * 10);
+            } else if (isSawHandle) {
+                setPixel(tx, ty, px, py, 135 + n * 15, 60 + n * 10, 30 + n * 10);
+            } else if (isSawBlade || isSawTeeth || isHammerHead) {
+                setPixel(tx, ty, px, py, 175 + n * 25, 180 + n * 25, 190 + n * 25);
+            } else if (isHammerHandle) {
+                setPixel(tx, ty, px, py, 105 + n * 15, 75 + n * 10, 45 + n * 10);
+            } else {
+                const isSeam = (py % 4 === 2) || (py < 6 && px === 7) || (py >= 6 && py < 10 && px === 14) || (py >= 10 && px === 3);
+                if (isSeam) {
+                    setPixel(tx, ty, px, py, 130 + n * 15, 95 + n * 10, 55 + n * 10);
+                } else {
+                    setPixel(tx, ty, px, py, 175 + n * 20, 135 + n * 15, 85 + n * 15);
+                }
+            }
+        });
+
+        // 37. JACK_O_LANTERN_FRONT (Glowing carved eyes and mouth)
+        fillTile(TILES.JACK_O_LANTERN_FRONT, (tx, ty, px, py) => {
+            const isLeftEye = (py === 4 && (px === 3 || px === 4)) ||
+                              (py === 5 && (px >= 3 && px <= 5)) ||
+                              (py === 6 && px === 4);
+            const isRightEye = (py === 4 && (px === 11 || px === 12)) ||
+                               (py === 5 && (px >= 10 && px <= 12)) ||
+                               (py === 6 && px === 11);
+            const isNose = (py === 7 && (px === 7 || px === 8));
+            const isMouth = (py === 9 && (px === 2 || px === 5 || px === 10 || px === 13)) ||
+                            (py === 10 && ((px >= 2 && px <= 6) || (px >= 9 && px <= 13))) ||
+                            (py === 11 && (px === 3 || px === 4 || (px >= 6 && px <= 9) || px === 11 || px === 12)) ||
+                            (py === 12 && (px === 4 || px === 7 || px === 8 || px === 11));
+            const isCarved = isLeftEye || isRightEye || isNose || isMouth;
+
+            const n = rnd();
+            if (isCarved) {
+                // Bright glowing yellow-white carved eyes/mouth
+                if (rnd() > 0.4) {
+                    setPixel(tx, ty, px, py, 255, 250 + Math.floor(n * 5), 180 + Math.floor(n * 40));
+                } else {
+                    setPixel(tx, ty, px, py, 255, 210 + Math.floor(n * 30), 70 + Math.floor(n * 30));
+                }
+            } else {
+                const isGroove = (px % 4 === 0);
+                if (isGroove) {
+                    setPixel(tx, ty, px, py, 170 + n * 20, 90 + n * 15, 18 + n * 10);
+                } else {
+                    setPixel(tx, ty, px, py, 215 + n * 25, 125 + n * 25, 25 + n * 15);
+                }
+            }
+        });
+
+        // 38. BIRCH_SIDE (White/cream bark with dark horizontal black/grey birch spots)
+        fillTile(TILES.BIRCH_SIDE, (tx, ty, px, py) => {
+            const n = rnd();
+            const isSpot = (py === 2 && px >= 4 && px <= 7) ||
+                           (py === 5 && px >= 10 && px <= 14) ||
+                           (py === 6 && px >= 11 && px <= 13) ||
+                           (py === 8 && px >= 1 && px <= 4) ||
+                           (py === 11 && px >= 7 && px <= 11) ||
+                           (py === 14 && px >= 12 && px <= 15) ||
+                           (py === 13 && px >= 2 && px <= 4);
+            const isSpotBorder = (py === 2 && (px === 3 || px === 8)) ||
+                                 (py === 5 && (px === 9 || px === 15)) ||
+                                 (py === 8 && (px === 0 || px === 5)) ||
+                                 (py === 11 && (px === 6 || px === 12));
+
+            if (isSpot) {
+                setPixel(tx, ty, px, py, 35 + n * 15, 35 + n * 15, 35 + n * 15);
+            } else if (isSpotBorder && rnd() > 0.4) {
+                setPixel(tx, ty, px, py, 120 + n * 20, 120 + n * 20, 115 + n * 20);
+            } else {
+                const shade = 220 + n * 25;
+                setPixel(tx, ty, px, py, shade, shade - 3, shade - 10);
+            }
+        });
+
+        // 39. BIRCH_TOP (Light cream concentric rings with white outer bark)
+        fillTile(TILES.BIRCH_TOP, (tx, ty, px, py) => {
+            const dx = px - 7.5;
+            const dy = py - 7.5;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const ring = Math.floor(dist) % 2 === 0;
+            const n = rnd();
+            if (dist > 7) {
+                const shade = 220 + n * 25;
+                setPixel(tx, ty, px, py, shade, shade - 3, shade - 10);
+            } else if (ring) {
+                setPixel(tx, ty, px, py, 205 + n * 20, 195 + n * 15, 160 + n * 10);
+            } else {
+                setPixel(tx, ty, px, py, 185 + n * 20, 175 + n * 15, 140 + n * 10);
+            }
+        });
+
+        // 40. BIRCH_LEAVES (Lighter vibrant yellow-green leaves with transparent pixel gaps)
+        fillTile(TILES.BIRCH_LEAVES, (tx, ty, px, py) => {
+            const n = rnd();
+            if (rnd() > 0.85) {
+                setPixel(tx, ty, px, py, 0, 0, 0, 0);
+            } else {
+                setPixel(tx, ty, px, py, 80 + n * 35, 150 + n * 40, 35 + n * 25, 240);
+            }
+        });
+
+        // 41. LAVA (Bright molten orange, red, and yellow glowing magma pattern)
+        fillTile(TILES.LAVA, (tx, ty, px, py) => {
+            const n = rnd();
+            const wave = Math.sin(px * 0.6 + py * 0.4) * 0.5 + 0.5;
+            const heat = (wave * 0.6 + n * 0.4);
+
+            if (heat > 0.72) {
+                setPixel(tx, ty, px, py, 255, 220 + Math.floor(n * 35), 40 + Math.floor(n * 40));
+            } else if (heat > 0.42) {
+                setPixel(tx, ty, px, py, 245 + Math.floor(n * 10), 125 + Math.floor(n * 40), 15 + Math.floor(n * 15));
+            } else {
+                setPixel(tx, ty, px, py, 190 + Math.floor(n * 25), 45 + Math.floor(n * 25), 10 + Math.floor(n * 10));
+            }
+        });
+
+        // 240..249: CRACK_0 through CRACK_9 (mining overlay)
+        // Progressive crack stages starting from center (8, 8) branching outward
+        const crackStages = Array.from({ length: 16 }, () => new Array(16).fill(255));
+        function markCrack(x, y, stage) {
+            if (x >= 0 && x < 16 && y >= 0 && y < 16) {
+                crackStages[y][x] = Math.min(crackStages[y][x], stage);
+            }
+        }
+
+        // Center cluster (stage 0)
+        markCrack(8, 8, 0);
+        markCrack(8, 7, 0);
+        markCrack(7, 8, 0);
+        markCrack(9, 8, 0);
+        markCrack(8, 9, 0);
+
+        // Branch 1 (Up-Left)
+        markCrack(7, 7, 1); markCrack(6, 7, 2); markCrack(6, 6, 3); markCrack(5, 5, 4);
+        markCrack(4, 5, 5); markCrack(3, 4, 6); markCrack(3, 3, 7); markCrack(2, 2, 8);
+        markCrack(1, 2, 9); markCrack(1, 1, 9);
+        // Sub-branch 1
+        markCrack(5, 6, 5); markCrack(4, 7, 6); markCrack(3, 7, 7); markCrack(2, 8, 8);
+        markCrack(1, 8, 9); markCrack(0, 8, 9);
+
+        // Branch 2 (Up)
+        markCrack(8, 6, 1); markCrack(7, 5, 2); markCrack(8, 4, 3); markCrack(7, 4, 4);
+        markCrack(7, 3, 5); markCrack(8, 2, 6); markCrack(7, 1, 7); markCrack(7, 0, 8);
+        // Sub-branch 2
+        markCrack(6, 3, 7); markCrack(5, 2, 8); markCrack(4, 1, 9); markCrack(3, 0, 9);
+
+        // Branch 3 (Up-Right)
+        markCrack(9, 7, 1); markCrack(9, 6, 2); markCrack(10, 6, 3); markCrack(11, 5, 4);
+        markCrack(11, 4, 5); markCrack(12, 4, 6); markCrack(13, 3, 7); markCrack(13, 2, 8);
+        markCrack(14, 2, 9); markCrack(15, 1, 9);
+        // Sub-branches 3
+        markCrack(10, 5, 5); markCrack(10, 4, 6); markCrack(9, 3, 7); markCrack(9, 2, 8);
+        markCrack(8, 1, 9); markCrack(8, 0, 9);
+        markCrack(12, 2, 7); markCrack(11, 1, 8); markCrack(12, 0, 9);
+
+        // Branch 4 (Right)
+        markCrack(10, 8, 1); markCrack(11, 8, 2); markCrack(11, 7, 3); markCrack(12, 7, 4);
+        markCrack(13, 8, 5); markCrack(14, 7, 6); markCrack(15, 7, 7); markCrack(15, 6, 8);
+
+        // Branch 5 (Down-Right)
+        markCrack(9, 9, 1); markCrack(10, 9, 2); markCrack(10, 10, 3); markCrack(11, 11, 4);
+        markCrack(12, 11, 5); markCrack(13, 12, 6); markCrack(13, 13, 7); markCrack(14, 13, 8);
+        markCrack(14, 14, 9); markCrack(15, 15, 9);
+        // Sub-branches 5
+        markCrack(11, 10, 5); markCrack(12, 9, 6); markCrack(13, 9, 7); markCrack(14, 8, 8);
+        markCrack(15, 8, 9);
+        markCrack(12, 12, 6); markCrack(12, 13, 7); markCrack(13, 14, 8); markCrack(14, 15, 9);
+
+        // Branch 6 (Down)
+        markCrack(8, 10, 1); markCrack(9, 11, 2); markCrack(8, 12, 3); markCrack(9, 12, 4);
+        markCrack(8, 13, 5); markCrack(9, 14, 6); markCrack(9, 15, 7);
+
+        // Branch 7 (Down-Left)
+        markCrack(7, 9, 1); markCrack(7, 10, 2); markCrack(6, 10, 3); markCrack(5, 11, 4);
+        markCrack(5, 12, 5); markCrack(4, 12, 6); markCrack(3, 13, 7); markCrack(2, 13, 8);
+        markCrack(2, 14, 9); markCrack(1, 15, 9);
+        // Sub-branches 7
+        markCrack(6, 11, 5); markCrack(7, 12, 6); markCrack(7, 13, 7); markCrack(8, 14, 8);
+        markCrack(8, 15, 9);
+        markCrack(4, 9, 6); markCrack(3, 10, 7); markCrack(2, 11, 8); markCrack(1, 11, 9);
+
+        // Branch 8 (Left)
+        markCrack(6, 8, 1); markCrack(5, 8, 2); markCrack(5, 7, 3); markCrack(4, 7, 4);
+        markCrack(3, 8, 5); markCrack(2, 8, 6); markCrack(2, 7, 7); markCrack(1, 7, 8);
+        markCrack(0, 7, 9);
+
+        for (let s = 0; s <= 9; s++) {
+            const crackTileIdx = TILES[`CRACK_${s}`];
+            const tx = crackTileIdx % 16;
+            const ty = Math.floor(crackTileIdx / 16);
+            if (typeof ctx.clearRect === 'function') {
+                ctx.clearRect(tx * 16, ty * 16, 16, 16);
+            }
+            for (let py = 0; py < 16; py++) {
+                for (let px = 0; px < 16; px++) {
+                    if (crackStages[py][px] <= s) {
+                        setPixel(tx, ty, px, py, 15, 15, 15, 190);
+                    }
+                }
+            }
+        }
+
         return canvas;
     }
+
+    const CRAFTING_RECIPES = [
+        {
+            id: 'planks_oak',
+            name: 'Wooden Planks (x4)',
+            output: { id: BLOCKS.PLANKS, count: 4 },
+            ingredients: [{ id: BLOCKS.WOOD, count: 1 }]
+        },
+        {
+            id: 'planks_birch',
+            name: 'Wooden Planks (x4)',
+            output: { id: BLOCKS.PLANKS, count: 4 },
+            ingredients: [{ id: BLOCKS.BIRCH_WOOD, count: 1 }]
+        },
+        {
+            id: 'crafting_table',
+            name: 'Crafting Table',
+            output: { id: BLOCKS.CRAFTING_TABLE, count: 1 },
+            ingredients: [{ id: BLOCKS.PLANKS, count: 4 }]
+        },
+        {
+            id: 'bookshelf',
+            name: 'Bookshelf',
+            output: { id: BLOCKS.BOOKSHELF, count: 1 },
+            ingredients: [{ id: BLOCKS.PLANKS, count: 6 }]
+        },
+        {
+            id: 'bricks',
+            name: 'Bricks (x2)',
+            output: { id: BLOCKS.BRICK, count: 2 },
+            ingredients: [{ id: BLOCKS.STONE, count: 2 }, { id: BLOCKS.DIRT, count: 2 }]
+        },
+        {
+            id: 'mossy_cobble',
+            name: 'Mossy Cobblestone',
+            output: { id: BLOCKS.MOSSY_COBBLESTONE, count: 1 },
+            ingredients: [{ id: BLOCKS.COBBLESTONE, count: 1 }, { id: BLOCKS.LEAVES, count: 1 }]
+        },
+        {
+            id: 'tnt',
+            name: 'TNT',
+            output: { id: BLOCKS.TNT, count: 1 },
+            ingredients: [{ id: BLOCKS.SAND, count: 4 }, { id: BLOCKS.COAL_ORE, count: 1 }]
+        },
+        {
+            id: 'jack_o_lantern',
+            name: "Jack o'Lantern",
+            output: { id: BLOCKS.JACK_O_LANTERN, count: 1 },
+            ingredients: [{ id: BLOCKS.PUMPKIN, count: 1 }, { id: BLOCKS.COAL_ORE, count: 1 }]
+        },
+        {
+            id: 'glowstone',
+            name: 'Glowstone',
+            output: { id: BLOCKS.GLOWSTONE, count: 1 },
+            ingredients: [{ id: BLOCKS.SAND, count: 2 }, { id: BLOCKS.GOLD_ORE, count: 1 }]
+        },
+        {
+            id: 'glass',
+            name: 'Glass (x2)',
+            output: { id: BLOCKS.GLASS, count: 2 },
+            ingredients: [{ id: BLOCKS.SAND, count: 2 }, { id: BLOCKS.COAL_ORE, count: 1 }]
+        }
+    ];
 
     return {
         BLOCKS,
         TILES,
         BLOCK_DEFS,
+        CRAFTING_RECIPES,
         getBlockFaceTexture,
         getTileUV,
         createTextureAtlasCanvas

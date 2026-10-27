@@ -237,11 +237,22 @@ describe('Improvements & Roadmap Verification Tests', () => {
     });
 
     describe('4. Blocks & Audio Module Enhancements', () => {
-        test('SoundFX includes playFuse, playExplode, and playHurt methods', () => {
+        test('SoundFX includes playFuse, playExplode, playHurt, playPickup, playCraft, and playMobHurt methods', () => {
             const sfx = new SoundFX();
             assert.strictEqual(typeof sfx.playFuse, 'function');
             assert.strictEqual(typeof sfx.playExplode, 'function');
             assert.strictEqual(typeof sfx.playHurt, 'function');
+            assert.strictEqual(typeof sfx.playPickup, 'function');
+            assert.strictEqual(typeof sfx.playCraft, 'function');
+            assert.strictEqual(typeof sfx.playMobHurt, 'function');
+
+            // Safe to invoke without audio context initialized
+            assert.doesNotThrow(() => sfx.playPickup());
+            assert.doesNotThrow(() => sfx.playCraft());
+            assert.doesNotThrow(() => sfx.playMobHurt('pig'));
+            assert.doesNotThrow(() => sfx.playMobHurt('sheep'));
+            assert.doesNotThrow(() => sfx.playMobHurt('zombie'));
+            assert.doesNotThrow(() => sfx.playMobHurt('creeper'));
         });
 
         test('All 20 blocks exist in Blocks registry and have required properties', () => {
@@ -426,9 +437,9 @@ describe('Improvements & Roadmap Verification Tests', () => {
                     UI.buildInventoryGrid();
                 }, 'buildInventoryGrid must not throw when HTMLElement has getter-only dataset');
 
-                assert.strictEqual(gridChildren.length, 20, 'Should have created 20 block inventory slots');
+                assert.strictEqual(gridChildren.length, 30, 'Should have created 30 block inventory slots');
                 assert.strictEqual(gridChildren[0].dataset.blockId, 1, 'First slot blockId should be 1');
-                assert.strictEqual(gridChildren[19].dataset.blockId, 20, 'Twentieth slot blockId should be 20');
+                assert.strictEqual(gridChildren[29].dataset.blockId, 30, 'Last slot blockId should be 30');
             } finally {
                 global.document = originalDoc;
             }
@@ -468,11 +479,68 @@ describe('Improvements & Roadmap Verification Tests', () => {
                     UI.buildInventoryGrid();
                 }, 'buildInventoryGrid must not throw even if dataset throws on access');
 
-                assert.strictEqual(gridChildren.length, 20, 'Should have created 20 block inventory slots');
+                assert.strictEqual(gridChildren.length, 30, 'Should have created 30 block inventory slots');
                 assert.strictEqual(gridChildren[0]['data-block-id'], 1, 'Attribute fallback stores block ID');
             } finally {
                 global.document = originalDoc;
             }
+        });
+
+        test('UI Manager crafting system (addCollectedItem, getItemCount, canCraftRecipe in survival vs peaceful/creative, craftRecipe)', () => {
+            const UI = require('../js/ui.js');
+
+            // Reset UI inventory counts
+            UI.inventoryCounts = {};
+            UI.gameMode = 'survival';
+
+            // Initially count is 0
+            assert.strictEqual(UI.getItemCount(Blocks.BLOCKS.WOOD), 0);
+            assert.strictEqual(UI.getItemCount(Blocks.BLOCKS.PLANKS), 0);
+
+            // addCollectedItem
+            UI.addCollectedItem(Blocks.BLOCKS.WOOD, 2);
+            assert.strictEqual(UI.getItemCount(Blocks.BLOCKS.WOOD), 2);
+
+            // Define a test recipe: 1 WOOD -> 4 PLANKS
+            const recipePlanks = {
+                id: 'test_planks',
+                name: 'Wooden Planks (x4)',
+                output: { id: Blocks.BLOCKS.PLANKS, count: 4 },
+                ingredients: [{ id: Blocks.BLOCKS.WOOD, count: 1 }]
+            };
+
+            // In survival mode with sufficient items: canCraft is true
+            assert.strictEqual(UI.canCraftRecipe(recipePlanks), true);
+
+            // Craft the recipe
+            const craftSuccess = UI.craftRecipe(recipePlanks);
+            assert.strictEqual(craftSuccess, true, 'Crafting should succeed');
+            assert.strictEqual(UI.getItemCount(Blocks.BLOCKS.WOOD), 1, '1 wood should be consumed');
+            assert.strictEqual(UI.getItemCount(Blocks.BLOCKS.PLANKS), 4, '4 planks should be added');
+
+            // Try recipe requiring more ingredients than available
+            const recipeBookshelf = {
+                id: 'test_bookshelf',
+                name: 'Bookshelf',
+                output: { id: Blocks.BLOCKS.BOOKSHELF, count: 1 },
+                ingredients: [{ id: Blocks.BLOCKS.PLANKS, count: 6 }]
+            };
+            assert.strictEqual(UI.canCraftRecipe(recipeBookshelf), false, 'Cannot craft bookshelf with only 4 planks in survival');
+            assert.strictEqual(UI.craftRecipe(recipeBookshelf), false, 'craftRecipe fails when missing ingredients');
+
+            // In peaceful mode: free crafting mode is active
+            UI.gameMode = 'peaceful';
+            assert.strictEqual(UI.isFreeCraftingMode(), true);
+            assert.strictEqual(UI.canCraftRecipe(recipeBookshelf), true, 'Free crafting allows crafting without ingredients');
+            const freeCraftSuccess = UI.craftRecipe(recipeBookshelf);
+            assert.strictEqual(freeCraftSuccess, true);
+            assert.strictEqual(UI.getItemCount(Blocks.BLOCKS.PLANKS), 4, 'Planks should NOT be consumed in peaceful mode');
+            assert.strictEqual(UI.getItemCount(Blocks.BLOCKS.BOOKSHELF), 1, 'Bookshelf output should be added');
+
+            // In creative mode: free crafting mode is active
+            UI.gameMode = 'creative';
+            assert.strictEqual(UI.isFreeCraftingMode(), true);
+            assert.strictEqual(UI.canCraftRecipe(recipeBookshelf), true);
         });
 
         test('PlayerController lock and unlock methods handle missing or failing APIs gracefully', () => {
@@ -495,4 +563,3 @@ describe('Improvements & Roadmap Verification Tests', () => {
         });
     });
 });
-
