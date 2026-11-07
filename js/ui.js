@@ -448,12 +448,18 @@
                     slot.appendChild(countEl);
                 }
 
-                slot.addEventListener('click', () => {
+                const selectSlot = (e) => {
+                    if (e && e.type === 'touchstart') {
+                        e.preventDefault();
+                        e.stopPropagation();
+                    }
                     if (this.player) {
                         this.player.selectedSlot = i;
                         this.updateActiveSlot(i);
                     }
-                });
+                };
+                slot.addEventListener('click', selectSlot);
+                slot.addEventListener('touchstart', selectSlot, { passive: false });
 
                 this.hotbarEl.appendChild(slot);
             }

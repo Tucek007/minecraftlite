@@ -796,3 +796,221 @@ html, body {
     text-overflow: ellipsis;
 }
 
+/* ==========================================
+   Mobile Touch Controls & Responsive Styles
+   ========================================== */
+#mobile-controls {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 25;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+body.touch-active #mobile-controls {
+    display: block;
+}
+
+#mobile-top-bar {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    gap: 8px;
+    pointer-events: auto;
+}
+
+.mobile-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    background: rgba(30, 30, 35, 0.75);
+    border: 2px solid rgba(255, 255, 255, 0.35);
+    color: #ffffff;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    transition: transform 0.08s ease, background 0.08s ease;
+    touch-action: manipulation;
+}
+
+.mobile-btn:active {
+    transform: scale(0.92);
+    background: rgba(70, 70, 85, 0.9);
+}
+
+/* D-Pad on Left */
+#mobile-dpad {
+    position: absolute;
+    bottom: 24px;
+    left: 20px;
+    width: 144px;
+    height: 144px;
+    pointer-events: auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.dpad-middle-row {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dpad-btn {
+    width: 44px;
+    height: 44px;
+    background: rgba(25, 28, 38, 0.72);
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    touch-action: none;
+    transition: transform 0.05s ease, background 0.05s ease;
+}
+
+.dpad-btn:active, .dpad-btn.pressed {
+    background: rgba(80, 140, 255, 0.85);
+    border-color: #ffffff;
+    transform: scale(0.94);
+}
+
+.dpad-btn.center {
+    font-size: 14px;
+    background: rgba(40, 44, 58, 0.72);
+}
+
+/* Action Buttons on Right */
+#mobile-actions {
+    position: absolute;
+    bottom: 24px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    align-items: center;
+    pointer-events: auto;
+}
+
+.action-btn {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: rgba(25, 28, 38, 0.75);
+    border: 2.5px solid rgba(255, 255, 255, 0.45);
+    color: #ffffff;
+    font-size: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    touch-action: none;
+    transition: transform 0.05s ease, background 0.05s ease;
+}
+
+.action-btn.jump {
+    width: 60px;
+    height: 60px;
+    font-size: 26px;
+    background: rgba(35, 60, 100, 0.82);
+    border-color: rgba(140, 185, 255, 0.8);
+}
+
+.action-btn:active, .action-btn.pressed {
+    background: rgba(255, 180, 50, 0.85);
+    border-color: #ffffff;
+    transform: scale(0.92);
+}
+
+/* Responsive adjustment for Mobile screens */
+@media (max-width: 768px) {
+    #hotbar {
+        gap: 2px;
+        padding: 2px;
+    }
+    .hotbar-slot {
+        width: 32px;
+        height: 32px;
+    }
+    .hotbar-slot canvas {
+        width: 24px;
+        height: 24px;
+    }
+    .slot-num {
+        font-size: 9px;
+        bottom: 0px;
+        right: 1px;
+    }
+    #minimap-container {
+        width: 104px;
+        top: 8px;
+        right: 8px;
+        padding: 4px;
+    }
+    .minimap-canvas-wrap {
+        width: 92px;
+        height: 92px;
+    }
+    #mobile-dpad {
+        bottom: 14px;
+        left: 10px;
+        width: 128px;
+        height: 128px;
+    }
+    .dpad-btn {
+        width: 38px;
+        height: 38px;
+        font-size: 15px;
+    }
+    #mobile-actions {
+        bottom: 14px;
+        right: 10px;
+        gap: 8px;
+    }
+    .action-btn {
+        width: 46px;
+        height: 46px;
+        font-size: 19px;
+    }
+    .action-btn.jump {
+        width: 52px;
+        height: 52px;
+        font-size: 22px;
+    }
+    .menu-box {
+        width: 90vw;
+        max-width: 340px;
+        padding: 18px 14px;
+    }
+    .inventory-box {
+        width: 95vw;
+        max-width: 95vw;
+        padding: 12px;
+    }
+    .inventory-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+

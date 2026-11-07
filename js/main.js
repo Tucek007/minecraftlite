@@ -26,6 +26,7 @@
     let debrisMaterial = null;
     let clock;
     let isPaused = true;
+    let isTouchDevice = false;
 
     // Continuous mouse breaking / placing
     let isMouseDown = false;
@@ -91,6 +92,16 @@
     function init() {
         if (initialized) return;
         initialized = true;
+
+        // 0. Detect Touch Devices
+        isTouchDevice = (typeof window !== 'undefined') && Boolean(
+            ('ontouchstart' in window) ||
+            (navigator.maxTouchPoints > 0) ||
+            (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+        );
+        if (isTouchDevice && typeof document !== 'undefined' && document.body) {
+            document.body.classList.add('touch-active');
+        }
 
         // 1. Setup Scene & Camera
         scene = new THREE.Scene();
@@ -804,23 +815,32 @@
 
         function lockPointer() {
             audio.init();
-            player.lock();
+            if (!isTouchDevice) {
+                player.lock();
+            }
         }
 
         function resumeGame() {
             isPaused = false;
             if (blocker) blocker.style.display = 'none';
             if (window.UI && window.UI.isInventoryOpen) window.UI.closeInventory();
-            lockPointer();
+            if (!isTouchDevice) {
+                lockPointer();
+            } else {
+                audio.init();
+            }
         }
 
         function pauseGame() {
             isPaused = true;
-            player.unlock();
+            if (!isTouchDevice) {
+                player.unlock();
+            }
             if (blocker) blocker.style.display = 'flex';
         }
 
         document.addEventListener('pointerlockchange', () => {
+            if (isTouchDevice) return;
             if (document.pointerLockElement === renderer.domElement) {
                 isPaused = false;
                 if (blocker) blocker.style.display = 'none';
@@ -868,7 +888,7 @@
             renderer.domElement.addEventListener('click', () => {
                 if (isPaused) {
                     resumeGame();
-                } else if (!player.isLocked && (!window.UI || !window.UI.isInventoryOpen)) {
+                } else if (!player.isLocked && !isTouchDevice && (!window.UI || !window.UI.isInventoryOpen)) {
                     lockPointer();
                 }
             });
@@ -1031,7 +1051,7 @@
 
         // Mouse click and hold for continuous mining, combat, and placing
         window.addEventListener('mousedown', (e) => {
-            if (isPaused || !player.isLocked) return;
+            if (isPaused || (!player.isLocked && !isTouchDevice)) return;
 
             isMouseDown = true;
             activeMouseButton = e.button;
@@ -1107,8 +1127,349 @@
 
         // Prevent context menu on right-click in game
         window.addEventListener('contextmenu', (e) => {
-            if (player.isLocked) e.preventDefault();
+            if (player.isLocked || isTouchDevice) e.preventDefault();
         });
+
+        // Setup Mobile Touch Controls (Virtual D-Pad, Jump/Break/Place buttons, Swipe-to-Look)
+        function setupMobileControls() {
+            window.addEventListener('touchstart', () => {
+                if (!isTouchDevice) {
+                    isTouchDevice = true;
+                    if (document.body) document.body.classList.add('touch-active');
+                }
+            }, { passive: true });
+
+            // 1. Mobile Top Bar buttons
+            const btnMobPause = document.getElementById('btn-mobile-pause');
+            const btnMobInv = document.getElementById('btn-mobile-inv');
+            const btnMobCam = document.getElementById('btn-mobile-camera');
+            const btnMobWeather = document.getElementById('btn-mobile-weather');
+            const btnMobTime = document.getElementById('btn-mobile-time');
+
+            function bindTap(el, action) {
+                if (!el) return;
+                const handler = (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    audio.init();
+                    action();
+                };
+                el.addEventListener('touchstart', handler, { passive: false });
+                el.addEventListener('click', handler);
+            }
+
+            bindTap(btnMobPause, () => {
+                if (isPaused) {
+                    resumeGame();
+                } else {
+                    pauseGame();
+                }
+            });
+
+            bindTap(btnMobInv, () => {
+                if (window.UI && typeof window.UI.toggleInventory === 'function') {
+                    window.UI.toggleInventory();
+                }
+            });
+
+            bindTap(btnMobCam, () => {
+                if (player && typeof player.cycleCameraMode === 'function') {
+                    player.cycleCameraMode();
+                }
+            });
+
+            bindTap(btnMobWeather, () => {
+                cycleWeather();
+            });
+
+            bindTap(btnMobTime, () => {
+                advanceTimeOfDay();
+            });
+
+            // 2. Mobile D-Pad (Left hand movement)
+            const dpad = document.getElementById('mobile-dpad');
+            const btnUp = document.getElementById('btn-dpad-up');
+            const btnDown = document.getElementById('btn-dpad-down');
+            const btnLeft = document.getElementById('btn-dpad-left');
+            const btnRight = document.getElementById('btn-dpad-right');
+            const btnCenter = document.getElementById('btn-dpad-center');
+
+            if (dpad) {
+                let dpadTouchId = null;
+
+                function updateDpadFromCoords(clientX, clientY) {
+                    const rect = dpad.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    const dx = clientX - centerX;
+                    const dy = clientY - centerY;
+                    const deadzone = 16;
+
+                    const w = dy < -deadzone;
+                    const s = dy > deadzone;
+                    const a = dx < -deadzone;
+                    const d = dx > deadzone;
+
+                    player.keys['KeyW'] = w;
+                    player.keys['KeyS'] = s;
+                    player.keys['KeyA'] = a;
+                    player.keys['KeyD'] = d;
+
+                    if (btnUp) btnUp.classList.toggle('pressed', w);
+                    if (btnDown) btnDown.classList.toggle('pressed', s);
+                    if (btnLeft) btnLeft.classList.toggle('pressed', a);
+                    if (btnRight) btnRight.classList.toggle('pressed', d);
+                }
+
+                function resetDpad() {
+                    dpadTouchId = null;
+                    player.keys['KeyW'] = false;
+                    player.keys['KeyS'] = false;
+                    player.keys['KeyA'] = false;
+                    player.keys['KeyD'] = false;
+                    if (btnUp) btnUp.classList.remove('pressed');
+                    if (btnDown) btnDown.classList.remove('pressed');
+                    if (btnLeft) btnLeft.classList.remove('pressed');
+                    if (btnRight) btnRight.classList.remove('pressed');
+                }
+
+                dpad.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    audio.init();
+
+                    const touch = e.changedTouches[0];
+                    if (dpadTouchId === null) {
+                        dpadTouchId = touch.identifier;
+
+                        if (btnCenter && (e.target === btnCenter || btnCenter.contains(e.target))) {
+                            player.keys['ShiftLeft'] = !player.keys['ShiftLeft'];
+                            btnCenter.classList.toggle('pressed', player.keys['ShiftLeft']);
+                            if (window.UI) {
+                                window.UI.showToast(player.keys['ShiftLeft'] ? 'Plížení ZAP 🚶' : 'Plížení VYP');
+                            }
+                            return;
+                        }
+
+                        updateDpadFromCoords(touch.clientX, touch.clientY);
+                    }
+                }, { passive: false });
+
+                dpad.addEventListener('touchmove', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        const touch = e.changedTouches[i];
+                        if (touch.identifier === dpadTouchId) {
+                            updateDpadFromCoords(touch.clientX, touch.clientY);
+                            break;
+                        }
+                    }
+                }, { passive: false });
+
+                const onDpadEnd = (e) => {
+                    for (let i = 0; i < e.changedTouches.length; i++) {
+                        if (e.changedTouches[i].identifier === dpadTouchId) {
+                            resetDpad();
+                            break;
+                        }
+                    }
+                };
+
+                dpad.addEventListener('touchend', onDpadEnd, { passive: false });
+                dpad.addEventListener('touchcancel', onDpadEnd, { passive: false });
+            }
+
+            // 3. Mobile Action Buttons (Right hand actions)
+            const btnJump = document.getElementById('btn-mobile-jump');
+            if (btnJump) {
+                let lastJumpTap = 0;
+                btnJump.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    audio.init();
+                    btnJump.classList.add('pressed');
+
+                    const now = performance.now();
+                    if (now - lastJumpTap < 320) {
+                        if (player.gameMode === 'creative' || player.gameMode === 'peaceful') {
+                            player.isFlying = !player.isFlying;
+                            player.velocity.y = 0;
+                            if (window.UI) window.UI.showToast(player.isFlying ? 'Létání aktivováno! 🪽' : 'Létání vypnuto');
+                        }
+                    }
+                    lastJumpTap = now;
+
+                    player.keys['Space'] = true;
+                }, { passive: false });
+
+                const onJumpEnd = (e) => {
+                    e.preventDefault();
+                    btnJump.classList.remove('pressed');
+                    player.keys['Space'] = false;
+                };
+                btnJump.addEventListener('touchend', onJumpEnd, { passive: false });
+                btnJump.addEventListener('touchcancel', onJumpEnd, { passive: false });
+            }
+
+            const btnBreak = document.getElementById('btn-mobile-break');
+            if (btnBreak) {
+                btnBreak.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (isPaused) return;
+                    audio.init();
+                    btnBreak.classList.add('pressed');
+
+                    isMouseDown = true;
+                    activeMouseButton = 0;
+                    triggerHandSwing();
+
+                    const heldId = (window.UI && typeof window.UI.getSelectedBlockId === 'function')
+                        ? window.UI.getSelectedBlockId()
+                        : 1;
+                    const heldDef = window.Blocks && window.Blocks.BLOCK_DEFS ? window.Blocks.BLOCK_DEFS[heldId] : null;
+                    if (heldDef && heldDef.isTool && audio && typeof audio.playSwordSwing === 'function') {
+                        audio.playSwordSwing();
+                    }
+
+                    const eyePos = player.eyePosition || {
+                        x: player.position.x,
+                        y: player.position.y + (player.currentEyeHeight || 1.62),
+                        z: player.position.z
+                    };
+                    const lookDir = typeof player.getLookDirection === 'function' ? player.getLookDirection() : { x: 0, y: 0, z: -1 };
+
+                    if (mobManager) {
+                        const mobHit = mobManager.raycastMob(eyePos, lookDir, 4.0);
+                        if (mobHit && mobHit.hit && (!player.targetBlock || !player.targetBlock.hit || mobHit.distance <= player.targetBlock.distance)) {
+                            const baseDmg = (heldDef && typeof heldDef.attackDamage === 'number') ? heldDef.attackDamage : 5;
+                            const dmg = (player.isFlying || player.gameMode === 'creative') ? 25 : baseDmg;
+                            mobManager.hitMob(mobHit.mob, dmg, player.position, {
+                                onMobKilled: (m) => {
+                                    spawnExplosionParticles(m.position.x, m.position.y + 0.5, m.position.z);
+                                    if (m.def && m.def.dropBlockId) {
+                                        spawnItemDrop(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z), m.def.dropBlockId);
+                                    }
+                                }
+                            });
+                            mouseActionCooldown = BREAK_COOLDOWN;
+                            return;
+                        }
+                    }
+
+                    if (player.isFlying || player.gameMode === 'creative') {
+                        onBreakBlock();
+                        mouseActionCooldown = BREAK_COOLDOWN;
+                    } else {
+                        miningHitTimer = 0;
+                    }
+                }, { passive: false });
+
+                const onBreakEnd = (e) => {
+                    e.preventDefault();
+                    btnBreak.classList.remove('pressed');
+                    if (activeMouseButton === 0) {
+                        isMouseDown = false;
+                        activeMouseButton = -1;
+                        miningProgress = 0;
+                        miningTargetKey = null;
+                        if (crackMesh) crackMesh.visible = false;
+                    }
+                };
+                btnBreak.addEventListener('touchend', onBreakEnd, { passive: false });
+                btnBreak.addEventListener('touchcancel', onBreakEnd, { passive: false });
+            }
+
+            const btnPlace = document.getElementById('btn-mobile-place');
+            if (btnPlace) {
+                btnPlace.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (isPaused) return;
+                    audio.init();
+                    btnPlace.classList.add('pressed');
+
+                    isMouseDown = true;
+                    activeMouseButton = 2;
+                    onPlaceOrInteract();
+                    mouseActionCooldown = PLACE_COOLDOWN;
+                }, { passive: false });
+
+                const onPlaceEnd = (e) => {
+                    e.preventDefault();
+                    btnPlace.classList.remove('pressed');
+                    if (activeMouseButton === 2) {
+                        isMouseDown = false;
+                        activeMouseButton = -1;
+                    }
+                };
+                btnPlace.addEventListener('touchend', onPlaceEnd, { passive: false });
+                btnPlace.addEventListener('touchcancel', onPlaceEnd, { passive: false });
+            }
+
+            // 4. Swipe-to-Look Camera Drag
+            let lookTouchId = null;
+            let lastLookX = 0;
+            let lastLookY = 0;
+
+            window.addEventListener('touchstart', (e) => {
+                if (isPaused) return;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    const target = touch.target;
+                    if (target && target.closest && (
+                        target.closest('#mobile-dpad') ||
+                        target.closest('#mobile-actions') ||
+                        target.closest('#mobile-top-bar') ||
+                        target.closest('#hotbar') ||
+                        target.closest('#inventory-overlay') ||
+                        target.closest('#pause-menu') ||
+                        target.closest('#minimap-container')
+                    )) {
+                        continue;
+                    }
+
+                    if (lookTouchId === null) {
+                        lookTouchId = touch.identifier;
+                        lastLookX = touch.clientX;
+                        lastLookY = touch.clientY;
+                        break;
+                    }
+                }
+            }, { passive: true });
+
+            window.addEventListener('touchmove', (e) => {
+                if (isPaused || lookTouchId === null) return;
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    const touch = e.changedTouches[i];
+                    if (touch.identifier === lookTouchId) {
+                        const dx = touch.clientX - lastLookX;
+                        const dy = touch.clientY - lastLookY;
+                        lastLookX = touch.clientX;
+                        lastLookY = touch.clientY;
+
+                        if (player && typeof player.addLookDelta === 'function') {
+                            player.addLookDelta(dx * 1.35, dy * 1.35);
+                        }
+                        break;
+                    }
+                }
+            }, { passive: true });
+
+            const onLookEnd = (e) => {
+                for (let i = 0; i < e.changedTouches.length; i++) {
+                    if (e.changedTouches[i].identifier === lookTouchId) {
+                        lookTouchId = null;
+                        break;
+                    }
+                }
+            };
+            window.addEventListener('touchend', onLookEnd, { passive: true });
+            window.addEventListener('touchcancel', onLookEnd, { passive: true });
+        }
+
+        setupMobileControls();
     }
 
     function onBreakBlock() {
@@ -1808,7 +2169,7 @@
     }
 
     function updateMining(dt) {
-        if (!player.isLocked || !isMouseDown || activeMouseButton !== 0) {
+        if ((!player.isLocked && !isTouchDevice) || !isMouseDown || activeMouseButton !== 0) {
             miningProgress = 0;
             miningTargetKey = null;
             if (crackMesh) crackMesh.visible = false;
@@ -2196,8 +2557,8 @@
                 audio.updateMusic(dt);
             }
 
-            // Handle continuous mouse placing
-            if (player.isLocked && isMouseDown && activeMouseButton === 2) {
+            // Handle continuous mouse / touch placing
+            if ((player.isLocked || isTouchDevice) && isMouseDown && activeMouseButton === 2) {
                 mouseActionCooldown -= dt;
                 if (mouseActionCooldown <= 0) {
                     onPlaceBlock();

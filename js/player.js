@@ -262,18 +262,18 @@
             this.keys[e.code] = false;
         }
 
-        onMouseMove(e) {
-            if (!this.isLocked) return;
-
-            const movementX = e.movementX || 0;
-            const movementY = e.movementY || 0;
-
-            this.yaw -= movementX * this.sensitivity;
-            this.pitch -= movementY * this.sensitivity;
+        addLookDelta(dx, dy) {
+            this.yaw -= dx * this.sensitivity;
+            this.pitch -= dy * this.sensitivity;
 
             // Clamp pitch to avoid gimbal flipping (-89 to +89 degrees)
             const maxPitch = (Math.PI / 2) - 0.01;
             this.pitch = Math.max(-maxPitch, Math.min(maxPitch, this.pitch));
+        }
+
+        onMouseMove(e) {
+            if (!this.isLocked) return;
+            this.addLookDelta(e.movementX || 0, e.movementY || 0);
         }
 
         update(dt) {

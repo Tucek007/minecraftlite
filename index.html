@@ -14,6 +14,36 @@
     <div id="damage-vignette"></div>
     <div id="sleep-overlay"></div>
 
+    <!-- Mobile Touch Controls Overlay -->
+    <div id="mobile-controls">
+        <!-- Top Left Quick Actions -->
+        <div id="mobile-top-bar">
+            <button type="button" id="btn-mobile-pause" class="mobile-btn" title="Pauza / Menu">⏸️</button>
+            <button type="button" id="btn-mobile-inv" class="mobile-btn" title="Inventář">🎒</button>
+            <button type="button" id="btn-mobile-camera" class="mobile-btn" title="Kamera (F5)">📷</button>
+            <button type="button" id="btn-mobile-weather" class="mobile-btn" title="Počasí">🌦️</button>
+            <button type="button" id="btn-mobile-time" class="mobile-btn" title="Čas">⏰</button>
+        </div>
+
+        <!-- Left D-Pad for Movement -->
+        <div id="mobile-dpad">
+            <button type="button" id="btn-dpad-up" class="dpad-btn up" aria-label="Dopředu">▲</button>
+            <div class="dpad-middle-row">
+                <button type="button" id="btn-dpad-left" class="dpad-btn left" aria-label="Doleva">◀</button>
+                <button type="button" id="btn-dpad-center" class="dpad-btn center" aria-label="Plížení">●</button>
+                <button type="button" id="btn-dpad-right" class="dpad-btn right" aria-label="Doprava">▶</button>
+            </div>
+            <button type="button" id="btn-dpad-down" class="dpad-btn down" aria-label="Dozadu">▼</button>
+        </div>
+
+        <!-- Right Action Buttons -->
+        <div id="mobile-actions">
+            <button type="button" id="btn-mobile-break" class="action-btn break" aria-label="Těžit / Útok">⛏️</button>
+            <button type="button" id="btn-mobile-place" class="action-btn place" aria-label="Položit / Použít">🧱</button>
+            <button type="button" id="btn-mobile-jump" class="action-btn jump" aria-label="Skok">⤊</button>
+        </div>
+    </div>
+
     <!-- Luxury Minimap & Environment Widget -->
     <div id="minimap-container">
         <div id="minimap-header">
