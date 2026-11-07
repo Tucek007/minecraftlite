@@ -11,6 +11,21 @@
     <!-- 3D Canvas Container -->
     <div id="game-container"></div>
     <div id="underwater-overlay"></div>
+    <div id="damage-vignette"></div>
+    <div id="sleep-overlay"></div>
+
+    <!-- Luxury Minimap & Environment Widget -->
+    <div id="minimap-container">
+        <div id="minimap-header">
+            <span id="minimap-time">☀️ 12:00</span>
+            <span id="minimap-weather">Jasno</span>
+        </div>
+        <div class="minimap-canvas-wrap">
+            <canvas id="minimap-canvas" width="112" height="112"></canvas>
+            <span class="compass-n">N</span>
+        </div>
+        <div id="minimap-footer">PLAINS &bull; 8, 25, 8</div>
+    </div>
 
     <!-- Center Crosshair -->
     <div id="crosshair"></div>
@@ -56,23 +71,24 @@
     <div id="inventory-overlay" style="display: none;">
         <div class="inventory-box">
             <div class="inventory-header">
-                <span class="inventory-title">Creative Inventory</span>
+                <span class="inventory-title">Creative Inventory &amp; Crafting</span>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <button type="button" id="btn-inv-gamemode" class="mc-btn small-btn">Režim: Survival</button>
                     <button type="button" id="btn-inventory-close" class="inventory-close-btn">&times;</button>
                 </div>
             </div>
-            <div class="inventory-subtitle">Inventář všech bloků. Click a block to put in current hotbar slot, or hover and press 1-9. Press 'E' or Esc to close.</div>
+            <div class="inventory-subtitle">Inventář všech bloků a nástrojů. Kliknutím vložíte do aktivního slotu hotbaru, nebo najeďte myší a stiskněte 1–9. Klávesa 'E' nebo Esc zavře okno.</div>
             <div id="crafting-section" class="crafting-section">
-                <div class="crafting-header">Crafting (Výroba předmětů) <span id="crafting-mode-hint" class="crafting-hint">V Klidném/Kreativním režimu lze kraftit zdarma bez surovin!</span></div>
+                <div class="crafting-header">Crafting (Výroba předmětů a výbavy) <span id="crafting-mode-hint" class="crafting-hint">V Klidném/Kreativním režimu lze kraftit zdarma bez surovin!</span></div>
                 <div id="crafting-grid" class="crafting-grid"></div>
             </div>
             <div id="inventory-grid" class="inventory-grid"></div>
             <div class="inventory-controls" style="margin-top: 10px; font-size: 11px; color: #888; display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;">
-                <div><span class="key-badge">G</span> : Přepnout režim (Survival / Klidný Crafting / Kreativní)</div>
+                <div><span class="key-badge">G</span> : Přepnout režim (Survival / Klidný / Kreativní)</div>
+                <div><span class="key-badge">R</span> : Počasí (Jasno / Déšť / Bouřka)</div>
+                <div><span class="key-badge">T</span> : Posunout denní dobu</div>
                 <div><span class="key-badge">F5</span> : Pohled 3. osoby</div>
-                <div><span class="key-badge">Ctrl</span> : Sprint (Sprint)</div>
-                <div><span class="key-badge">Střední tl. myši</span> : Vybrat blok pod kurzorem (Pick Block)</div>
+                <div><span class="key-badge">Střední tl. myši</span> : Pick Block</div>
             </div>
         </div>
     </div>
@@ -81,10 +97,14 @@
     <div id="pause-menu">
         <div class="menu-box">
             <div class="menu-title">MINECRAFT LITE</div>
-            <div class="menu-subtitle">3D Procedural Voxel Engine &bull; WebGL</div>
+            <div class="menu-subtitle">Luxury 3D Procedural Voxel Engine &bull; WebGL</div>
             <div class="menu-buttons">
                 <button type="button" id="btn-resume" class="mc-btn primary">Click to Play / Resume</button>
                 <button type="button" id="btn-gamemode" class="mc-btn">Režim hry: Survival</button>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" id="btn-weather" class="mc-btn" style="flex: 1;">Počasí: Jasno</button>
+                    <button type="button" id="btn-music" class="mc-btn" style="flex: 1;">Hudba C418: ZAP</button>
+                </div>
                 <button type="button" id="btn-save" class="mc-btn">Save World</button>
                 <button type="button" id="btn-load" class="mc-btn">Load World</button>
                 <button type="button" id="btn-reset" class="mc-btn">Generate New World</button>
@@ -104,21 +124,15 @@
                 </div>
             </div>
             <div class="controls-card">
-                <div><span class="key-badge">W</span> <span class="key-badge">A</span> <span class="key-badge">S</span> <span class="key-badge">D</span> : Pohyb (Move)</div>
-                <div><span class="key-badge">Ctrl</span> : Sprint (Sprint)</div>
-                <div><span class="key-badge">Mezerník</span> : Skok / Let nahoru (Jump)</div>
-                <div><span class="key-badge">2x Mezerník</span> : Přepnout létání (Double-Jump Fly)</div>
-                <div><span class="key-badge">Shift</span> : Plížení / Let dolů (Sneak)</div>
-                <div><span class="key-badge">G</span> : Přepnout herní režim (Survival / Bez boje & Crafting / Kreativní)</div>
-                <div><span class="key-badge">F</span> : Přepnout Creative Létání (Fly Mode)</div>
-                <div><span class="key-badge">F5</span> : Přepnout kameru 1. / 3. osoby (Postava Steve)</div>
-                <div><span class="key-badge">E</span> : Inventář všech bloků (Creative Inventory)</div>
-                <div><span class="key-badge">Levé tl. myši</span> : Těžit blok (Hold to dig)</div>
-                <div><span class="key-badge">Pravé tl. myši</span> : Položit / Zapálit TNT (Place / Ignite)</div>
-                <div><span class="key-badge">Střední tl. myši</span> : Vybrat blok pod kurzorem (Pick Block)</div>
-                <div><span class="key-badge">1</span> - <span class="key-badge">9</span> / <span class="key-badge">Kolečko</span> : Výběr bloku (Select)</div>
-                <div><span class="key-badge">F3</span> : Debug info & souřadnice (Debug)</div>
-                <div><span class="key-badge">Esc</span> : Pozastavit / Menu (Pause)</div>
+                <div><span class="key-badge">W</span> <span class="key-badge">A</span> <span class="key-badge">S</span> <span class="key-badge">D</span> : Pohyb / Šplhání po žebříku</div>
+                <div><span class="key-badge">Ctrl</span> : Sprint &bull; <span class="key-badge">Shift</span> : Plížení &bull; <span class="key-badge">2x Space</span> : Létání</div>
+                <div><span class="key-badge">G</span> : Herní režim (Survival / Klidný / Kreativní)</div>
+                <div><span class="key-badge">R</span> : Přepnout počasí (Jasno / Déšť &amp; Sníh / Bouřka)</div>
+                <div><span class="key-badge">T</span> : Posunout denní dobu (Ráno / Poledne / Soumrak / Noc)</div>
+                <div><span class="key-badge">F5</span> : Kamera 1. / 3. osoby (Model Steva) &bull; <span class="key-badge">E</span> : Inventář &amp; Crafting</div>
+                <div><span class="key-badge">Levé tl.</span> : Boj mečem / Těžba krumpáčem</div>
+                <div><span class="key-badge">Pravé tl.</span> : Položit blok / Spát v posteli / Crafting Table / TNT</div>
+                <div><span class="key-badge">F3</span> : Debug info &bull; <span class="key-badge">Esc</span> : Pauza / Menu</div>
             </div>
         </div>
     </div>

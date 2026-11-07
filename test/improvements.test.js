@@ -437,9 +437,9 @@ describe('Improvements & Roadmap Verification Tests', () => {
                     UI.buildInventoryGrid();
                 }, 'buildInventoryGrid must not throw when HTMLElement has getter-only dataset');
 
-                assert.strictEqual(gridChildren.length, 30, 'Should have created 30 block inventory slots');
+                assert.strictEqual(gridChildren.length, 38, 'Should have created 38 block/tool inventory slots');
                 assert.strictEqual(gridChildren[0].dataset.blockId, 1, 'First slot blockId should be 1');
-                assert.strictEqual(gridChildren[29].dataset.blockId, 30, 'Last slot blockId should be 30');
+                assert.strictEqual(gridChildren[37].dataset.blockId, 38, 'Last slot blockId should be 38');
             } finally {
                 global.document = originalDoc;
             }
@@ -479,7 +479,7 @@ describe('Improvements & Roadmap Verification Tests', () => {
                     UI.buildInventoryGrid();
                 }, 'buildInventoryGrid must not throw even if dataset throws on access');
 
-                assert.strictEqual(gridChildren.length, 30, 'Should have created 30 block inventory slots');
+                assert.strictEqual(gridChildren.length, 38, 'Should have created 38 block/tool inventory slots');
                 assert.strictEqual(gridChildren[0]['data-block-id'], 1, 'Attribute fallback stores block ID');
             } finally {
                 global.document = originalDoc;
@@ -560,6 +560,76 @@ describe('Improvements & Roadmap Verification Tests', () => {
             assert.doesNotThrow(() => {
                 player.unlock();
             }, 'player.unlock must not throw in node/test environment');
+        });
+    });
+
+    describe('Luxury Package Features (Flora, Interactive Blocks, Tools, C418 Audio, Minimap)', () => {
+        test('New blocks, flora, and tools are defined with expected luxury properties', () => {
+            assert.strictEqual(Blocks.BLOCK_DEFS[Blocks.BLOCKS.TORCH].crossMesh, true);
+            assert.strictEqual(Blocks.BLOCK_DEFS[Blocks.BLOCKS.TORCH].lightLevel, 15);
+            assert.strictEqual(Blocks.BLOCK_DEFS[Blocks.BLOCKS.BED].interactive, true);
+            assert.strictEqual(Blocks.BLOCK_DEFS[Blocks.BLOCKS.LADDER].climbable, true);
+            assert.strictEqual(Blocks.BLOCK_DEFS[Blocks.BLOCKS.FLOWER_RED].crossMesh, true);
+            assert.strictEqual(Blocks.BLOCK_DEFS[Blocks.BLOCKS.FLOWER_YELLOW].crossMesh, true);
+            assert.strictEqual(Blocks.BLOCK_DEFS[Blocks.BLOCKS.TALL_GRASS].crossMesh, true);
+            assert.strictEqual(Blocks.BLOCK_DEFS[Blocks.BLOCKS.PICKAXE_DIAMOND].isTool, true);
+            assert.strictEqual(Blocks.BLOCK_DEFS[Blocks.BLOCKS.PICKAXE_DIAMOND].miningSpeedMultiplier, 3.5);
+            assert.strictEqual(Blocks.BLOCK_DEFS[Blocks.BLOCKS.SWORD_DIAMOND].isTool, true);
+            assert.strictEqual(Blocks.BLOCK_DEFS[Blocks.BLOCKS.SWORD_DIAMOND].attackDamage, 12);
+        });
+
+        test('World isTargetable, isClimbable, and X-Mesh cross geometry for flora/torches', () => {
+            const world = new World.VoxelWorld(4242);
+            world.setBlock(5, 30, 5, Blocks.BLOCKS.FLOWER_RED);
+            world.setBlock(6, 30, 5, Blocks.BLOCKS.LADDER);
+
+            assert.strictEqual(world.isSolid(5, 30, 5), false, 'Flower is non-solid for walking');
+            assert.strictEqual(world.isTargetable(5, 30, 5), true, 'Flower is targetable by raycast');
+            assert.strictEqual(world.isClimbable(6, 30, 5), true, 'Ladder is climbable');
+            assert.strictEqual(world.isTargetable(6, 30, 5), true, 'Ladder is targetable');
+        });
+
+        test('PlayerController ladder climbing, screen shake, and bed spawnPoint respawn', () => {
+            const PlayerController = require('../js/player.js');
+            const world = new World.VoxelWorld(101);
+            const camera = { position: { set: () => {} }, rotation: { order: 'YXZ', y: 0, x: 0, z: 0 }, fov: 75, updateProjectionMatrix: () => {} };
+            const player = new PlayerController(camera, null, world, null);
+
+            // Screen shake
+            player.addScreenShake(0.25, 0.3);
+            assert.strictEqual(player.shakeIntensity, 0.25);
+            assert.strictEqual(player.shakeTimer, 0.3);
+
+            // Ladder climbing
+            world.setBlock(10, 25, 10, Blocks.BLOCKS.LADDER);
+            player.position.x = 10.5;
+            player.position.y = 25.1;
+            player.position.z = 10.5;
+            player.keys['Space'] = true;
+            player.update(0.05);
+            assert.strictEqual(player.onLadder, true, 'Player detects ladder');
+            assert.ok(player.velocity.y > 0, 'Climbing upward when Space is pressed on ladder');
+            player.keys['Space'] = false;
+
+            // Bed spawnPoint respawn
+            player.spawnPoint = { x: 44.5, y: 28.1, z: -12.5 };
+            player.respawn();
+            assert.strictEqual(player.position.x, 44.5);
+            assert.strictEqual(player.position.y, 28.1);
+            assert.strictEqual(player.position.z, -12.5);
+        });
+
+        test('SoundFX C418 ambient music and weather/combat sound effects execute safely', () => {
+            const SoundFX = require('../js/audio.js');
+            const sfx = new SoundFX();
+            assert.doesNotThrow(() => {
+                sfx.playThunder();
+                sfx.playRainTick();
+                sfx.playSleep();
+                sfx.playSwordSwing();
+                sfx.playAmbientNote(392.0, 1.5);
+                sfx.updateMusic(0.5);
+            });
         });
     });
 });

@@ -61,16 +61,18 @@ describe('Blocks module tests', () => {
         }
     });
 
-    test('Registry contains all 31 blocks (Air + 30 solid/liquid block types)', () => {
+    test('Registry contains all 39 blocks (Air + 38 blocks, flora, and tools)', () => {
         const expectedBlocks = [
             'AIR', 'GRASS', 'DIRT', 'STONE', 'COBBLESTONE',
             'WOOD', 'LEAVES', 'PLANKS', 'BRICK', 'SAND',
             'GLASS', 'WATER', 'COAL_ORE', 'IRON_ORE', 'BEDROCK',
             'TNT', 'BOOKSHELF', 'OBSIDIAN', 'GOLD_ORE', 'DIAMOND_ORE',
             'SNOW', 'GLOWSTONE', 'MOSSY_COBBLESTONE', 'CACTUS', 'PUMPKIN',
-            'GRAVEL', 'CRAFTING_TABLE', 'JACK_O_LANTERN', 'BIRCH_WOOD', 'BIRCH_LEAVES', 'LAVA'
+            'GRAVEL', 'CRAFTING_TABLE', 'JACK_O_LANTERN', 'BIRCH_WOOD', 'BIRCH_LEAVES', 'LAVA',
+            'TORCH', 'BED', 'LADDER', 'FLOWER_RED', 'FLOWER_YELLOW', 'TALL_GRASS',
+            'PICKAXE_DIAMOND', 'SWORD_DIAMOND'
         ];
-        assert.strictEqual(Object.keys(Blocks.BLOCKS).length, 31);
+        assert.strictEqual(Object.keys(Blocks.BLOCKS).length, 39);
         for (const name of expectedBlocks) {
             assert.ok(name in Blocks.BLOCKS, `Missing block key ${name}`);
             const id = Blocks.BLOCKS[name];
@@ -86,6 +88,14 @@ describe('Blocks module tests', () => {
         assert.strictEqual(Blocks.BLOCKS.BIRCH_WOOD, 28);
         assert.strictEqual(Blocks.BLOCKS.BIRCH_LEAVES, 29);
         assert.strictEqual(Blocks.BLOCKS.LAVA, 30);
+        assert.strictEqual(Blocks.BLOCKS.TORCH, 31);
+        assert.strictEqual(Blocks.BLOCKS.BED, 32);
+        assert.strictEqual(Blocks.BLOCKS.LADDER, 33);
+        assert.strictEqual(Blocks.BLOCKS.FLOWER_RED, 34);
+        assert.strictEqual(Blocks.BLOCKS.FLOWER_YELLOW, 35);
+        assert.strictEqual(Blocks.BLOCKS.TALL_GRASS, 36);
+        assert.strictEqual(Blocks.BLOCKS.PICKAXE_DIAMOND, 37);
+        assert.strictEqual(Blocks.BLOCKS.SWORD_DIAMOND, 38);
     });
 
     test('All block definitions have valid hardness values', () => {
@@ -120,7 +130,15 @@ describe('Blocks module tests', () => {
             JACK_O_LANTERN: 0.6,
             BIRCH_WOOD: 0.85,
             BIRCH_LEAVES: 0.2,
-            LAVA: 0.5
+            LAVA: 0.5,
+            TORCH: 0.1,
+            BED: 0.4,
+            LADDER: 0.4,
+            FLOWER_RED: 0.05,
+            FLOWER_YELLOW: 0.05,
+            TALL_GRASS: 0.05,
+            PICKAXE_DIAMOND: 0.5,
+            SWORD_DIAMOND: 0.5
         };
 
         for (const [name, expected] of Object.entries(expectedHardness)) {

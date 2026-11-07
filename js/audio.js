@@ -15,6 +15,9 @@
         constructor() {
             this.ctx = null;
             this.enabled = true;
+            this.musicEnabled = true;
+            this.musicTimer = 2.0;
+            this.musicStep = 0;
         }
 
         init() {
@@ -457,6 +460,192 @@
 
             noise.start(t);
             noise.stop(t + duration);
+        }
+
+        /**
+         * Thunder clap & deep atmospheric rumble
+         */
+        playThunder() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+
+            const t = this.ctx.currentTime;
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = this.createNoiseBuffer(1.2);
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(950, t);
+            filter.frequency.exponentialRampToValueAtTime(45, t + 1.15);
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.55, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 1.18);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            noise.start(t);
+            noise.stop(t + 1.2);
+
+            const osc = this.ctx.createOscillator();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(90, t);
+            osc.frequency.exponentialRampToValueAtTime(22, t + 0.9);
+            const oscGain = this.ctx.createGain();
+            oscGain.gain.setValueAtTime(0.35, t);
+            oscGain.gain.exponentialRampToValueAtTime(0.01, t + 0.95);
+            osc.connect(oscGain);
+            oscGain.connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 1.0);
+        }
+
+        /**
+         * Gentle rain patter tick
+         */
+        playRainTick() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+
+            const t = this.ctx.currentTime;
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = this.createNoiseBuffer(0.09);
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(2200, t);
+            filter.Q.setValueAtTime(1.5, t);
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.035, t);
+            gain.gain.exponentialRampToValueAtTime(0.005, t + 0.085);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            noise.start(t);
+            noise.stop(t + 0.09);
+        }
+
+        /**
+         * Soothing sleep lullaby chord when resting in a Bed
+         */
+        playSleep() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+
+            const freqs = [261.63, 329.63, 392.00, 523.25];
+            const t = this.ctx.currentTime;
+            freqs.forEach((f, idx) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                const startT = t + idx * 0.08;
+                osc.frequency.setValueAtTime(f, startT);
+                gain.gain.setValueAtTime(0.12, startT);
+                gain.gain.exponentialRampToValueAtTime(0.005, startT + 0.7);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(startT);
+                osc.stop(startT + 0.72);
+            });
+        }
+
+        /**
+         * Crisp sword slash whoosh
+         */
+        playSwordSwing() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+
+            const t = this.ctx.currentTime;
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = this.createNoiseBuffer(0.12);
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(1800, t);
+            filter.frequency.exponentialRampToValueAtTime(600, t + 0.11);
+            filter.Q.setValueAtTime(2.5, t);
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.28, t);
+            gain.gain.exponentialRampToValueAtTime(0.01, t + 0.11);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            noise.start(t);
+            noise.stop(t + 0.12);
+        }
+
+        /**
+         * Plays a single C418-style warm ambient piano/pad note
+         */
+        playAmbientNote(freq = 329.63, duration = 2.4) {
+            if (!this.ctx || !this.enabled || !this.musicEnabled) return;
+            this.resume();
+
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const subOsc = this.ctx.createOscillator();
+            const filter = this.ctx.createBiquadFilter();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(freq, t);
+
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(freq * 0.5, t);
+
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(900, t);
+            filter.frequency.exponentialRampToValueAtTime(320, t + duration);
+
+            gain.gain.setValueAtTime(0.001, t);
+            if (typeof gain.gain.linearRampToValueAtTime === 'function') {
+                gain.gain.linearRampToValueAtTime(0.055, t + 0.18);
+            } else {
+                gain.gain.setValueAtTime(0.055, t + 0.18);
+            }
+            gain.gain.exponentialRampToValueAtTime(0.001, t + duration);
+
+            osc.connect(filter);
+            subOsc.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(t);
+            subOsc.start(t);
+            osc.stop(t + duration + 0.05);
+            subOsc.stop(t + duration + 0.05);
+        }
+
+        /**
+         * Procedural C418-style peaceful ambient music loop
+         */
+        updateMusic(dt) {
+            if (!this.ctx || !this.enabled || !this.musicEnabled) return;
+            this.musicTimer -= dt;
+            if (this.musicTimer <= 0) {
+                const scale = [261.63, 293.66, 329.63, 392.00, 440.00, 523.25, 659.25];
+                const pattern = [0, 2, 4, 2, 5, 4, 1, 3, 2, 0];
+                const noteIdx = pattern[this.musicStep % pattern.length];
+                this.musicStep++;
+
+                const rootFreq = scale[noteIdx];
+                this.playAmbientNote(rootFreq, 2.8);
+                if (this.musicStep % 3 === 0) {
+                    const fifthFreq = scale[(noteIdx + 2) % scale.length];
+                    this.playAmbientNote(fifthFreq, 3.2);
+                }
+
+                this.musicTimer = 3.2 + (this.musicStep % 3) * 1.1;
+            }
         }
     }
 

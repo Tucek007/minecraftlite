@@ -75,6 +75,12 @@
             this.stepDistance = 0;
             this.wasInWater = false;
 
+            // Custom Bed Spawnpoint, Ladder climbing & Screen Shake
+            this.spawnPoint = null;
+            this.onLadder = false;
+            this.shakeTimer = 0;
+            this.shakeIntensity = 0;
+
             // Input state
             this.keys = {};
             this.isLocked = false;
@@ -82,6 +88,11 @@
             this.selectedSlot = 0; // 0..8
 
             this.setupEventListeners();
+        }
+
+        addScreenShake(intensity = 0.15, duration = 0.25) {
+            this.shakeIntensity = Math.max(this.shakeIntensity, intensity);
+            this.shakeTimer = Math.max(this.shakeTimer, duration);
         }
 
         setupEventListeners() {
@@ -346,12 +357,28 @@
                 }
             }
 
+            // Ladder climbing check
+            const onLadder = Boolean(this.world && typeof this.world.isClimbable === 'function' && (
+                this.world.isClimbable(this.position.x, this.position.y + 0.15, this.position.z) ||
+                this.world.isClimbable(this.position.x, this.position.y + 1.0, this.position.z)
+            ));
+            this.onLadder = onLadder;
+
             // Vertical movement
             if (this.isFlying) {
                 let targetVy = 0;
                 if (this.keys['Space']) targetVy += moveSpeed;
                 if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) targetVy -= moveSpeed;
                 this.velocity.y += (targetVy - this.velocity.y) * Math.min(1.0, 15.0 * delta);
+            } else if (onLadder) {
+                this.fallDistance = 0;
+                if (this.keys['Space'] || this.keys['KeyW']) {
+                    this.velocity.y = 4.2;
+                } else if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) {
+                    this.velocity.y = 0;
+                } else {
+                    this.velocity.y = Math.max(this.velocity.y - 12.0 * delta, -2.2);
+                }
             } else if (inWater) {
                 // Buoyancy and swimming in water
                 let targetVy = -1.5; // gentle sinking in water
@@ -385,7 +412,7 @@
             };
 
             // Fall distance tracking
-            if (!this.onGround && !this.isFlying && !inWater) {
+            if (!this.onGround && !this.isFlying && !inWater && !onLadder) {
                 if (this.velocity.y < 0) {
                     this.fallDistance += Math.abs(displacement.y);
                 }
@@ -410,7 +437,7 @@
                 this.onGround = result.onGround;
 
                 // Check landing for fall damage
-                if (!wasGroundedBefore && this.onGround && !this.isFlying && !inWater && this.gameMode !== 'creative') {
+                if (!wasGroundedBefore && this.onGround && !this.isFlying && !inWater && !onLadder && this.gameMode !== 'creative') {
                     if (this.fallDistance > 3.0) {
                         const damage = Math.floor(this.fallDistance - 3.0);
                         if (damage > 0) {
@@ -517,7 +544,9 @@
 
             // Void recovery
             if (this.position.y < -10) {
-                const spawn = this.getSafeSpawnPosition(8.5, 8.5);
+                const targetX = (this.spawnPoint && typeof this.spawnPoint.x === 'number') ? this.spawnPoint.x : 8.5;
+                const targetZ = (this.spawnPoint && typeof this.spawnPoint.z === 'number') ? this.spawnPoint.z : 8.5;
+                const spawn = this.getSafeSpawnPosition(targetX, targetZ);
                 this.position.x = spawn.x;
                 this.position.y = spawn.y;
                 this.position.z = spawn.z;
@@ -554,6 +583,19 @@
                 }
             }
 
+            // Screen shake offset calculation
+            let shakeX = 0, shakeY = 0, shakeRoll = 0;
+            if (this.shakeTimer > 0) {
+                this.shakeTimer = Math.max(0, this.shakeTimer - delta);
+                const s = this.shakeIntensity * (this.shakeTimer / 0.25);
+                shakeX = (Math.random() - 0.5) * s;
+                shakeY = (Math.random() - 0.5) * s;
+                shakeRoll = (Math.random() - 0.5) * s * 0.25;
+                if (this.shakeTimer <= 0) {
+                    this.shakeIntensity = 0;
+                }
+            }
+
             // Eye position calculation
             const eyeX = this.position.x;
             const eyeY = this.position.y + this.currentEyeHeight + bobY;
@@ -563,15 +605,15 @@
             // Sync camera position and rotation
             if (this.camera && this.camera.position) {
                 if (this.cameraMode === 0) {
-                    this.camera.position.x = eyeX;
-                    this.camera.position.y = eyeY;
+                    this.camera.position.x = eyeX + shakeX;
+                    this.camera.position.y = eyeY + shakeY;
                     this.camera.position.z = eyeZ;
 
                     if (this.camera.rotation) {
                         this.camera.rotation.order = 'YXZ';
                         this.camera.rotation.x = this.pitch;
                         this.camera.rotation.y = this.yaw;
-                        this.camera.rotation.z = 0;
+                        this.camera.rotation.z = shakeRoll;
                     }
                 } else {
                     const lookDir = this.getLookDirection();
@@ -595,8 +637,8 @@
                         }
                     }
 
-                    this.camera.position.x = eyeX + lookDir.x * dirSign * dist;
-                    this.camera.position.y = eyeY + lookDir.y * dirSign * dist;
+                    this.camera.position.x = eyeX + lookDir.x * dirSign * dist + shakeX;
+                    this.camera.position.y = eyeY + lookDir.y * dirSign * dist + shakeY;
                     this.camera.position.z = eyeZ + lookDir.z * dirSign * dist;
 
                     if (this.camera.rotation) {
@@ -604,11 +646,11 @@
                         if (this.cameraMode === 1) {
                             this.camera.rotation.x = this.pitch;
                             this.camera.rotation.y = this.yaw;
-                            this.camera.rotation.z = 0;
+                            this.camera.rotation.z = shakeRoll;
                         } else {
                             this.camera.rotation.x = -this.pitch;
                             this.camera.rotation.y = this.yaw + Math.PI;
-                            this.camera.rotation.z = 0;
+                            this.camera.rotation.z = shakeRoll;
                         }
                     }
                 }
@@ -655,7 +697,7 @@
                 eyePos,
                 lookDir,
                 this.reachDistance,
-                (x, y, z) => this.world.isSolid(x, y, z)
+                (x, y, z) => (typeof this.world.isTargetable === 'function' ? this.world.isTargetable(x, y, z) : this.world.isSolid(x, y, z))
             );
         }
 
@@ -717,12 +759,18 @@
             this.timeSinceLastDamage = 0;
             this.regenTimer = 0;
             this.health = Math.max(0, this.health - amount);
+            this.addScreenShake(0.18, 0.25);
             if (this.audio && typeof this.audio.playHurt === 'function') {
                 this.audio.playHurt();
             }
             const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
-            if (UI && typeof UI.updateHealth === 'function') {
-                UI.updateHealth(this.health);
+            if (UI) {
+                if (typeof UI.updateHealth === 'function') {
+                    UI.updateHealth(this.health);
+                }
+                if (typeof UI.triggerDamageFlash === 'function') {
+                    UI.triggerDamageFlash();
+                }
             }
             if (this.health <= 0) {
                 this.die();
@@ -762,7 +810,16 @@
             this.drownTimer = 0;
             this.timeSinceLastDamage = 0;
             this.regenTimer = 0;
-            const spawn = this.getSafeSpawnPosition(8.5, 8.5);
+            const targetX = (this.spawnPoint && typeof this.spawnPoint.x === 'number') ? this.spawnPoint.x : 8.5;
+            const targetZ = (this.spawnPoint && typeof this.spawnPoint.z === 'number') ? this.spawnPoint.z : 8.5;
+            const spawn = this.getSafeSpawnPosition(targetX, targetZ);
+            if (
+                this.spawnPoint &&
+                typeof this.spawnPoint.y === 'number' &&
+                (!this.world || !this.world.isSolid(Math.floor(targetX), Math.floor(this.spawnPoint.y), Math.floor(targetZ)))
+            ) {
+                spawn.y = this.spawnPoint.y;
+            }
             this.position.x = spawn.x;
             this.position.y = spawn.y;
             this.position.z = spawn.z;

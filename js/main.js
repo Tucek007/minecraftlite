@@ -45,6 +45,16 @@
     let lastHeldBlockId = -1;
     let handSwingTimer = 0;
     const HAND_SWING_DURATION = 0.22;
+    let handPointLight = null;
+
+    // Weather & Atmosphere
+    let weatherState = 'clear'; // 'clear' | 'rain' | 'thunder'
+    let weatherGroup = null;
+    let lightningFlashTimer = 0;
+    let rainSoundTimer = 0;
+    let textureAnimTimer = 0;
+    let totalElapsedTime = 0;
+    let lavaSparkTimer = 0;
 
     // Dynamic Water Flow
     let waterFlowQueue = [];
@@ -155,8 +165,9 @@
         // 8b. Setup 3D First-Person Held Block in Hand
         setupHeldBlock();
 
-        // 8c. Setup 3D Sky Clouds
+        // 8c. Setup 3D Sky Clouds & Weather
         setupClouds();
+        setupWeather();
 
         // 8d. Setup 3D Third-Person Steve Player Model
         setupPlayerModel();
@@ -192,6 +203,8 @@
             oxygen: player.oxygen !== undefined ? player.oxygen : 15.0,
             gameMode: player.gameMode || 'survival',
             dayTime: dayTime,
+            weatherState: weatherState,
+            spawnPoint: player.spawnPoint || null,
             isFlying: player.isFlying
         };
         safeSetStorage('minecraftlite_player', JSON.stringify(playerData));
@@ -245,6 +258,19 @@
             if (typeof data.dayTime === 'number' && !isNaN(data.dayTime)) {
                 dayTime = data.dayTime;
             }
+            if (typeof data.weatherState === 'string') {
+                weatherState = data.weatherState;
+                if (window.UI && typeof window.UI.updateWeatherUI === 'function') {
+                    window.UI.updateWeatherUI(weatherState);
+                }
+            }
+            if (data.spawnPoint && typeof data.spawnPoint.x === 'number') {
+                player.spawnPoint = {
+                    x: data.spawnPoint.x,
+                    y: data.spawnPoint.y,
+                    z: data.spawnPoint.z
+                };
+            }
             if (typeof data.isFlying === 'boolean') {
                 player.isFlying = data.isFlying;
             }
@@ -262,6 +288,9 @@
         sunLight = new THREE.DirectionalLight(0xffffff, 0.85);
         sunLight.position.set(50, 100, 50);
         scene.add(sunLight);
+
+        handPointLight = new THREE.PointLight(0xffaa44, 0, 14, 1.5);
+        scene.add(handPointLight);
 
         // Sun Billboard
         const sunGeo = new THREE.PlaneGeometry(16, 16);
@@ -379,14 +408,36 @@
 
     function updateHeldBlock(dt) {
         if (!heldBlockMesh) return;
+        const currentId = (window.UI && typeof window.UI.getSelectedBlockId === 'function')
+            ? window.UI.getSelectedBlockId()
+            : 1;
+
+        // Dynamic handheld point light when holding Torch, Glowstone, Jack o'Lantern, or Lava
+        if (handPointLight && player) {
+            const bDef = window.Blocks && window.Blocks.BLOCK_DEFS ? window.Blocks.BLOCK_DEFS[currentId] : null;
+            const isLightItem = Boolean(
+                (bDef && bDef.light) ||
+                currentId === 31 || // TORCH
+                currentId === 21 || // GLOWSTONE
+                currentId === 25 || // JACK_O_LANTERN
+                currentId === 27    // LAVA
+            );
+            if (isLightItem) {
+                handPointLight.intensity = 1.2 + Math.sin(totalElapsedTime * 11.0) * 0.14;
+                handPointLight.position.set(
+                    player.position.x,
+                    player.position.y + 1.35,
+                    player.position.z
+                );
+            } else {
+                handPointLight.intensity = 0;
+            }
+        }
+
         if (player && player.cameraMode > 0) {
             heldBlockMesh.visible = false;
             return;
         }
-
-        const currentId = (window.UI && typeof window.UI.getSelectedBlockId === 'function')
-            ? window.UI.getSelectedBlockId()
-            : 1;
 
         if (currentId !== lastHeldBlockId) {
             lastHeldBlockId = currentId;
@@ -464,6 +515,148 @@
             }
             while (cloud.position.z - pz < -120) {
                 cloud.position.z += 240;
+            }
+        }
+    }
+
+    function setupWeather() {
+        weatherGroup = new THREE.Group();
+        const dropGeo = new THREE.BoxGeometry(0.05, 0.55, 0.05);
+        const dropMat = new THREE.MeshBasicMaterial({
+            color: 0x77aaff,
+            transparent: true,
+            opacity: 0.68,
+            depthWrite: false
+        });
+
+        for (let i = 0; i < 160; i++) {
+            const drop = new THREE.Mesh(dropGeo, dropMat);
+            drop.position.set(
+                (Math.random() - 0.5) * 38,
+                Math.random() * 24,
+                (Math.random() - 0.5) * 38
+            );
+            weatherGroup.add(drop);
+        }
+        weatherGroup.visible = false;
+        scene.add(weatherGroup);
+    }
+
+    function cycleWeather() {
+        if (weatherState === 'clear') weatherState = 'rain';
+        else if (weatherState === 'rain') weatherState = 'thunder';
+        else weatherState = 'clear';
+
+        if (window.UI) {
+            if (typeof window.UI.updateWeatherUI === 'function') {
+                window.UI.updateWeatherUI(weatherState);
+            }
+            const names = {
+                clear: 'Počasí: Jasno ☀️',
+                rain: 'Počasí: Déšť / Sněžení 🌧️',
+                thunder: 'Počasí: Bouřka s blesky ⛈️'
+            };
+            window.UI.showToast(names[weatherState] || 'Počasí změněno');
+        }
+    }
+
+    function advanceTimeOfDay() {
+        // Snap to next major quarter of day: 0 (Dawn), 0.25 (Noon), 0.5 (Dusk), 0.75 (Midnight)
+        const quarters = [0.0, 0.25, 0.5, 0.75];
+        let nextQ = 0.25;
+        for (let i = 0; i < quarters.length; i++) {
+            if (dayTime < quarters[i] - 0.02) {
+                nextQ = quarters[i];
+                break;
+            }
+            if (i === quarters.length - 1) {
+                nextQ = 0.0;
+            }
+        }
+        dayTime = nextQ;
+        const labels = {
+            0: 'Čas: Svítání (06:00) 🌅',
+            0.25: 'Čas: Poledne (12:00) ☀️',
+            0.5: 'Čas: Západ slunce (18:00) 🌇',
+            0.75: 'Čas: Půlnoc (00:00) 🌙'
+        };
+        if (window.UI) {
+            window.UI.showToast(labels[dayTime] || 'Čas posunut');
+        }
+    }
+
+    function updateWeather(dt) {
+        if (!weatherGroup || !player) return;
+
+        if (lightningFlashTimer > 0) {
+            lightningFlashTimer = Math.max(0, lightningFlashTimer - dt);
+        }
+
+        if (weatherState === 'clear') {
+            weatherGroup.visible = false;
+            return;
+        }
+
+        const biome = (world && typeof world.getBiome === 'function')
+            ? world.getBiome(Math.floor(player.position.x), Math.floor(player.position.z))
+            : 'plains';
+
+        if (biome === 'desert') {
+            // Desert remains dry even during storms
+            weatherGroup.visible = false;
+            return;
+        }
+
+        weatherGroup.visible = true;
+        const isSnow = biome === 'mountains';
+        const fallSpeed = isSnow ? 5.2 : 22.0;
+
+        const firstChild = weatherGroup.children[0];
+        if (firstChild && firstChild.material) {
+            firstChild.material.color.setHex(isSnow ? 0xffffff : 0x77aaff);
+        }
+
+        const px = player.position.x;
+        const py = player.position.y;
+        const pz = player.position.z;
+
+        for (let i = 0; i < weatherGroup.children.length; i++) {
+            const drop = weatherGroup.children[i];
+            drop.scale.y = isSnow ? 0.25 : 1.0;
+            drop.scale.x = isSnow ? 2.2 : 1.0;
+            drop.scale.z = isSnow ? 2.2 : 1.0;
+
+            drop.position.y -= fallSpeed * dt;
+            if (isSnow) {
+                drop.position.x += Math.sin(totalElapsedTime * 2.0 + i) * 0.8 * dt;
+            }
+
+            if (drop.position.y < py - 6) {
+                drop.position.y = py + 14 + Math.random() * 6;
+                drop.position.x = px + (Math.random() - 0.5) * 34;
+                drop.position.z = pz + (Math.random() - 0.5) * 34;
+            }
+        }
+
+        if (!isPaused && !isSnow) {
+            rainSoundTimer -= dt;
+            if (rainSoundTimer <= 0) {
+                rainSoundTimer = 0.22 + Math.random() * 0.15;
+                if (audio && typeof audio.playRainTick === 'function') {
+                    audio.playRainTick();
+                }
+            }
+        }
+
+        if (!isPaused && weatherState === 'thunder') {
+            if (Math.random() < dt * 0.08) {
+                lightningFlashTimer = 0.22;
+                if (audio && typeof audio.playThunder === 'function') {
+                    audio.playThunder();
+                }
+                if (typeof player.addScreenShake === 'function') {
+                    player.addScreenShake(0.16, 0.35);
+                }
             }
         }
     }
@@ -584,6 +777,30 @@
         const saveBtn = document.getElementById('btn-save');
         const loadBtn = document.getElementById('btn-load');
         const resetBtn = document.getElementById('btn-reset');
+        const weatherBtn = document.getElementById('btn-weather');
+        const musicBtn = document.getElementById('btn-music');
+
+        if (weatherBtn) {
+            weatherBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                cycleWeather();
+            });
+        }
+
+        if (musicBtn) {
+            musicBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (audio) {
+                    audio.musicEnabled = !audio.musicEnabled;
+                    if (window.UI && typeof window.UI.updateMusicUI === 'function') {
+                        window.UI.updateMusicUI(audio.musicEnabled);
+                    }
+                    if (window.UI) {
+                        window.UI.showToast(audio.musicEnabled ? 'Ambientní hudba zapnuta 🎵' : 'Ambientní hudba vypnuta 🔇');
+                    }
+                }
+            });
+        }
 
         function lockPointer() {
             audio.init();
@@ -663,6 +880,12 @@
                     window.UI.closeInventory();
                 } else if (!isPaused) {
                     pauseGame();
+                }
+            } else if (!isPaused && (!window.UI || !window.UI.isInventoryOpen)) {
+                if (e.code === 'KeyR') {
+                    cycleWeather();
+                } else if (e.code === 'KeyT') {
+                    advanceTimeOfDay();
                 }
             }
         });
@@ -778,6 +1001,7 @@
 
                     world = new window.World.VoxelWorld(newSeed);
                     player.world = world;
+                    player.spawnPoint = null;
                     if (mobManager) mobManager.world = world;
                     if (window.UI) {
                         window.UI.world = world;
@@ -794,6 +1018,10 @@
                     player.fallDistance = 0;
                     player.onGround = true;
                     dayTime = 0.25;
+                    weatherState = 'clear';
+                    if (window.UI && typeof window.UI.updateWeatherUI === 'function') {
+                        window.UI.updateWeatherUI(weatherState);
+                    }
                     loadSurroundingChunks(true);
                     window.UI.showToast('Generated New World!');
                     resumeGame();
@@ -812,6 +1040,14 @@
                 // Left Click: Combat or progressive mining
                 triggerHandSwing();
 
+                const heldId = (window.UI && typeof window.UI.getSelectedBlockId === 'function')
+                    ? window.UI.getSelectedBlockId()
+                    : 1;
+                const heldDef = window.Blocks && window.Blocks.BLOCK_DEFS ? window.Blocks.BLOCK_DEFS[heldId] : null;
+                if (heldDef && heldDef.isTool && audio && typeof audio.playSwordSwing === 'function') {
+                    audio.playSwordSwing();
+                }
+
                 // Check mob melee hit within 4.0 blocks
                 const eyePos = player.eyePosition || {
                     x: player.position.x,
@@ -823,7 +1059,8 @@
                 if (mobManager) {
                     const mobHit = mobManager.raycastMob(eyePos, lookDir, 4.0);
                     if (mobHit && mobHit.hit && (!player.targetBlock || !player.targetBlock.hit || mobHit.distance <= player.targetBlock.distance)) {
-                        const dmg = (player.isFlying || player.gameMode === 'creative') ? 25 : 5;
+                        const baseDmg = (heldDef && typeof heldDef.attackDamage === 'number') ? heldDef.attackDamage : 5;
+                        const dmg = (player.isFlying || player.gameMode === 'creative') ? 25 : baseDmg;
                         mobManager.hitMob(mobHit.mob, dmg, player.position, {
                             onMobKilled: (m) => {
                                 spawnExplosionParticles(m.position.x, m.position.y + 0.5, m.position.z);
@@ -844,7 +1081,7 @@
                     miningHitTimer = 0;
                 }
             } else if (e.button === 2) {
-                // Right Click: Place or interact (e.g. ignite TNT, crafting table)
+                // Right Click: Place or interact (e.g. ignite TNT, crafting table, bed)
                 onPlaceOrInteract();
                 mouseActionCooldown = PLACE_COOLDOWN;
             }
@@ -921,6 +1158,41 @@
             return;
         }
 
+        // Right-clicking Bed sets spawnpoint, heals player, and skips night/storm!
+        const bedId = (window.Blocks && window.Blocks.BLOCKS && window.Blocks.BLOCKS.BED !== undefined)
+            ? window.Blocks.BLOCKS.BED
+            : 32;
+        if (hitBlockId === bedId && !player.isSneaking) {
+            player.spawnPoint = {
+                x: hitPos.x + 0.5,
+                y: hitPos.y + 1.1,
+                z: hitPos.z + 0.5
+            };
+            player.health = 20;
+            if (window.UI && typeof window.UI.updateHealth === 'function') {
+                window.UI.updateHealth(20);
+            }
+            if (audio && typeof audio.playSleep === 'function') {
+                audio.playSleep();
+            }
+            if (window.UI && typeof window.UI.triggerSleepFade === 'function') {
+                window.UI.triggerSleepFade();
+            }
+            dayTime = 0.25; // Morning
+            if (weatherState !== 'clear') {
+                weatherState = 'clear';
+                if (window.UI && typeof window.UI.updateWeatherUI === 'function') {
+                    window.UI.updateWeatherUI(weatherState);
+                }
+            }
+            if (window.UI) {
+                window.UI.showToast('Uloženo lůžko (Spawnpoint)! Dobré ráno! 🛏️');
+            }
+            isMouseDown = false;
+            activeMouseButton = -1;
+            return;
+        }
+
         // Right-clicking TNT ignites it!
         if (hitBlockId === window.Blocks.BLOCKS.TNT) {
             igniteTNT(hitPos.x, hitPos.y, hitPos.z);
@@ -935,13 +1207,22 @@
     function onPlaceBlock() {
         if (!player.targetBlock || !player.targetBlock.hit) return;
 
+        const selectedBlockId = window.UI.getSelectedBlockId();
+        const bDef = window.Blocks.BLOCK_DEFS[selectedBlockId];
+
+        // Tools (Pickaxe, Sword) cannot be placed as blocks in the world
+        if (bDef && bDef.isTool) {
+            triggerHandSwing();
+            if (audio && typeof audio.playSwordSwing === 'function') {
+                audio.playSwordSwing();
+            }
+            return;
+        }
+
         const placePos = player.targetBlock.placePos;
         if (!player.canPlaceBlockAt(placePos.x, placePos.y, placePos.z)) {
             return; // Can't place inside player
         }
-
-        const selectedBlockId = window.UI.getSelectedBlockId();
-        const bDef = window.Blocks.BLOCK_DEFS[selectedBlockId];
 
         triggerHandSwing();
         world.setBlock(placePos.x, placePos.y, placePos.z, selectedBlockId);
@@ -1435,6 +1716,9 @@
             z: player.position.z - tPos.z
         };
         const dist = Math.sqrt(pVec.x * pVec.x + pVec.y * pVec.y + pVec.z * pVec.z);
+        if (dist < 14.0 && typeof player.addScreenShake === 'function') {
+            player.addScreenShake((1.0 - dist / 14.0) * 0.35, 0.4);
+        }
         if (dist < 8.0) {
             const normX = pVec.x / Math.max(0.01, dist);
             const normZ = pVec.z / Math.max(0.01, dist);
@@ -1578,7 +1862,13 @@
         }
 
         const hardness = (bDef && typeof bDef.hardness === 'number' && bDef.hardness > 0) ? bDef.hardness : 0.5;
-        miningProgress += dt / hardness;
+        const heldId = (window.UI && typeof window.UI.getSelectedBlockId === 'function')
+            ? window.UI.getSelectedBlockId()
+            : 1;
+        const heldDef = window.Blocks && window.Blocks.BLOCK_DEFS ? window.Blocks.BLOCK_DEFS[heldId] : null;
+        const toolMult = (heldDef && typeof heldDef.miningSpeedMultiplier === 'number') ? heldDef.miningSpeedMultiplier : 1.0;
+
+        miningProgress += (dt * toolMult) / hardness;
         miningHitTimer -= dt;
 
         if (miningHitTimer <= 0) {
@@ -1803,6 +2093,21 @@
             sunLight.intensity = 0.05;
             starField.material.opacity = 0.95;
         }
+
+        // Weather & Lightning atmospheric overrides
+        if (weatherState !== 'clear') {
+            const stormColor = new THREE.Color(weatherState === 'thunder' ? 0x1b2230 : 0x3b485e);
+            scene.background.lerp(stormColor, weatherState === 'thunder' ? 0.72 : 0.48);
+            scene.fog.color.copy(scene.background);
+            sunLight.intensity *= (weatherState === 'thunder' ? 0.35 : 0.55);
+            ambientLight.intensity *= 0.75;
+        }
+        if (lightningFlashTimer > 0) {
+            const flashColor = new THREE.Color(0xddeeff);
+            scene.background.lerp(flashColor, 0.8);
+            scene.fog.color.copy(scene.background);
+            ambientLight.intensity = 1.4;
+        }
     }
 
     function updateParticles(dt) {
@@ -1850,10 +2155,46 @@
         requestAnimationFrame(animate);
 
         const dt = Math.min(0.1, clock.getDelta());
+        totalElapsedTime += dt;
+
+        // Animated water & lava textures
+        textureAnimTimer += dt;
+        if (textureAnimTimer > 0.12) {
+            textureAnimTimer = 0;
+            if (window.Blocks && typeof window.Blocks.updateAnimatedTextures === 'function' && atlasCanvas && atlasTexture) {
+                window.Blocks.updateAnimatedTextures(atlasCanvas, totalElapsedTime);
+                atlasTexture.needsUpdate = true;
+            }
+        }
+
+        // Occasional lava sparks near player
+        lavaSparkTimer += dt;
+        if (lavaSparkTimer > 0.35 && player && world && window.Blocks && window.Blocks.BLOCKS) {
+            lavaSparkTimer = 0;
+            const lavaId = window.Blocks.BLOCKS.LAVA || 27;
+            const rx = Math.floor(player.position.x + (Math.random() - 0.5) * 14);
+            const ry = Math.max(1, Math.floor(player.position.y + (Math.random() - 0.5) * 8));
+            const rz = Math.floor(player.position.z + (Math.random() - 0.5) * 14);
+            if (world.getBlock(rx, ry, rz) === lavaId) {
+                const geo = new THREE.BoxGeometry(0.12, 0.12, 0.12);
+                const mat = new THREE.MeshBasicMaterial({ color: Math.random() > 0.5 ? 0xffaa00 : 0xff4400 });
+                const pMesh = new THREE.Mesh(geo, mat);
+                pMesh.position.set(rx + Math.random(), ry + 1.0, rz + Math.random());
+                scene.add(pMesh);
+                particles.push({
+                    mesh: pMesh,
+                    vel: { x: (Math.random() - 0.5) * 2.2, y: 3.5 + Math.random() * 2.5, z: (Math.random() - 0.5) * 2.2 },
+                    life: 0.55
+                });
+            }
+        }
 
         if (!isPaused) {
             player.update(dt);
             updateMining(dt);
+            if (audio && typeof audio.updateMusic === 'function') {
+                audio.updateMusic(dt);
+            }
 
             // Handle continuous mouse placing
             if (player.isLocked && isMouseDown && activeMouseButton === 2) {
@@ -1869,6 +2210,7 @@
         updateDroppedItems(dt);
         updateHeldBlock(dt);
         updateClouds(dt);
+        updateWeather(dt);
         updatePlayerModel(dt);
 
         if (mobManager && !isPaused) {
@@ -1905,7 +2247,7 @@
             loadSurroundingChunks();
         }
 
-        window.UI.update(dt);
+        window.UI.update(dt, dayTime, weatherState, mobManager ? mobManager.mobs : null);
         renderer.render(scene, camera);
     }
 

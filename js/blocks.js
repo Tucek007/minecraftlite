@@ -42,7 +42,15 @@
         JACK_O_LANTERN: 27,
         BIRCH_WOOD: 28,
         BIRCH_LEAVES: 29,
-        LAVA: 30
+        LAVA: 30,
+        TORCH: 31,
+        BED: 32,
+        LADDER: 33,
+        FLOWER_RED: 34,
+        FLOWER_YELLOW: 35,
+        TALL_GRASS: 36,
+        PICKAXE_DIAMOND: 37,
+        SWORD_DIAMOND: 38
     };
 
     // Texture tile coordinates in 16x16 grid (index = tileY * 16 + tileX)
@@ -89,6 +97,15 @@
         BIRCH_TOP: 39,
         BIRCH_LEAVES: 40,
         LAVA: 41,
+        TORCH: 42,
+        BED_TOP: 43,
+        BED_SIDE: 44,
+        LADDER: 45,
+        FLOWER_RED: 46,
+        FLOWER_YELLOW: 47,
+        TALL_GRASS: 48,
+        PICKAXE_DIAMOND: 49,
+        SWORD_DIAMOND: 50,
         CRACK_0: 240,
         CRACK_1: 241,
         CRACK_2: 242,
@@ -502,6 +519,120 @@
             sound: 'stone',
             textures: {
                 all: TILES.LAVA
+            }
+        },
+        [BLOCKS.TORCH]: {
+            id: BLOCKS.TORCH,
+            name: 'Torch',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            targetable: true,
+            crossMesh: true,
+            lightLevel: 15,
+            hardness: 0.1,
+            sound: 'wood',
+            textures: {
+                all: TILES.TORCH
+            }
+        },
+        [BLOCKS.BED]: {
+            id: BLOCKS.BED,
+            name: 'Bed',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            interactive: true,
+            hardness: 0.4,
+            sound: 'wood',
+            textures: {
+                top: TILES.BED_TOP,
+                bottom: TILES.PLANKS,
+                sides: TILES.BED_SIDE
+            }
+        },
+        [BLOCKS.LADDER]: {
+            id: BLOCKS.LADDER,
+            name: 'Ladder',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            targetable: true,
+            climbable: true,
+            hardness: 0.4,
+            sound: 'wood',
+            textures: {
+                all: TILES.LADDER
+            }
+        },
+        [BLOCKS.FLOWER_RED]: {
+            id: BLOCKS.FLOWER_RED,
+            name: 'Poppy Flower',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            targetable: true,
+            crossMesh: true,
+            hardness: 0.05,
+            sound: 'grass',
+            textures: {
+                all: TILES.FLOWER_RED
+            }
+        },
+        [BLOCKS.FLOWER_YELLOW]: {
+            id: BLOCKS.FLOWER_YELLOW,
+            name: 'Dandelion Flower',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            targetable: true,
+            crossMesh: true,
+            hardness: 0.05,
+            sound: 'grass',
+            textures: {
+                all: TILES.FLOWER_YELLOW
+            }
+        },
+        [BLOCKS.TALL_GRASS]: {
+            id: BLOCKS.TALL_GRASS,
+            name: 'Tall Grass',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            targetable: true,
+            crossMesh: true,
+            hardness: 0.05,
+            sound: 'grass',
+            textures: {
+                all: TILES.TALL_GRASS
+            }
+        },
+        [BLOCKS.PICKAXE_DIAMOND]: {
+            id: BLOCKS.PICKAXE_DIAMOND,
+            name: 'Diamond Pickaxe',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            isTool: true,
+            miningSpeedMultiplier: 3.5,
+            hardness: 0.5,
+            sound: 'stone',
+            textures: {
+                all: TILES.PICKAXE_DIAMOND
+            }
+        },
+        [BLOCKS.SWORD_DIAMOND]: {
+            id: BLOCKS.SWORD_DIAMOND,
+            name: 'Diamond Sword',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            isTool: true,
+            attackDamage: 12,
+            hardness: 0.5,
+            sound: 'stone',
+            textures: {
+                all: TILES.SWORD_DIAMOND
             }
         }
     };
@@ -1172,6 +1303,175 @@
             }
         });
 
+        // 42. TORCH (Wooden stick with glowing flame tip)
+        fillTile(TILES.TORCH, (tx, ty, px, py) => {
+            if (typeof ctx.clearRect === 'function' && px === 0 && py === 0) {
+                ctx.clearRect(tx * 16, ty * 16, 16, 16);
+            }
+            const n = rnd();
+            if (px >= 7 && px <= 8 && py >= 6 && py <= 15) {
+                // Wooden handle
+                setPixel(tx, ty, px, py, 145 + n * 25, 105 + n * 20, 55 + n * 15, 255);
+            } else if (px >= 7 && px <= 8 && py >= 4 && py <= 5) {
+                // Coal head
+                setPixel(tx, ty, px, py, 40, 35, 35, 255);
+            } else if (px >= 6 && px <= 9 && py >= 1 && py <= 4) {
+                // Glowing flame
+                const isCore = (px >= 7 && px <= 8 && py >= 2 && py <= 3);
+                if (isCore) {
+                    setPixel(tx, ty, px, py, 255, 250, 180, 255);
+                } else {
+                    setPixel(tx, ty, px, py, 255, 155 + n * 50, 25, 240);
+                }
+            }
+        });
+
+        // 43. BED_TOP (White pillow + crimson blanket)
+        fillTile(TILES.BED_TOP, (tx, ty, px, py) => {
+            const n = rnd();
+            const isFrame = (px === 0 || px === 15 || py === 0 || py === 15);
+            if (isFrame) {
+                setPixel(tx, ty, px, py, 155 + n * 20, 115 + n * 15, 65 + n * 10);
+            } else if (py <= 5) {
+                // Pillow
+                const shade = 230 + n * 20;
+                setPixel(tx, ty, px, py, shade, shade, shade);
+            } else {
+                // Red wool blanket
+                setPixel(tx, ty, px, py, 185 + n * 25, 35 + n * 15, 35 + n * 15);
+            }
+        });
+
+        // 44. BED_SIDE (Red mattress + wood frame + legs)
+        fillTile(TILES.BED_SIDE, (tx, ty, px, py) => {
+            const n = rnd();
+            if (py <= 6) {
+                if (px <= 4) {
+                    const shade = 230 + n * 20;
+                    setPixel(tx, ty, px, py, shade, shade, shade);
+                } else {
+                    setPixel(tx, ty, px, py, 185 + n * 25, 35 + n * 15, 35 + n * 15);
+                }
+            } else if (py <= 11) {
+                setPixel(tx, ty, px, py, 165 + n * 20, 125 + n * 15, 75 + n * 10);
+            } else {
+                if (px <= 2 || px >= 13) {
+                    setPixel(tx, ty, px, py, 130 + n * 15, 95 + n * 10, 55 + n * 10);
+                } else {
+                    setPixel(tx, ty, px, py, 35, 35, 35);
+                }
+            }
+        });
+
+        // 45. LADDER (Wooden side rails and horizontal rungs)
+        fillTile(TILES.LADDER, (tx, ty, px, py) => {
+            if (typeof ctx.clearRect === 'function' && px === 0 && py === 0) {
+                ctx.clearRect(tx * 16, ty * 16, 16, 16);
+            }
+            const n = rnd();
+            const isRail = (px >= 2 && px <= 3) || (px >= 12 && px <= 13);
+            const isRung = (px >= 2 && px <= 13) && (py === 2 || py === 3 || py === 6 || py === 7 || py === 10 || py === 11 || py === 14);
+            if (isRail || isRung) {
+                setPixel(tx, ty, px, py, 165 + n * 25, 125 + n * 20, 70 + n * 15, 255);
+            }
+        });
+
+        // 46. FLOWER_RED (Crimson poppy on green stem)
+        fillTile(TILES.FLOWER_RED, (tx, ty, px, py) => {
+            if (typeof ctx.clearRect === 'function' && px === 0 && py === 0) {
+                ctx.clearRect(tx * 16, ty * 16, 16, 16);
+            }
+            const n = rnd();
+            const dx = px - 7.5;
+            const dy = py - 5.5;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 1.3) {
+                setPixel(tx, ty, px, py, 40, 25, 15, 255);
+            } else if (dist < 3.6) {
+                setPixel(tx, ty, px, py, 220 + n * 35, 25 + n * 25, 25 + n * 20, 255);
+            } else if (px >= 7 && px <= 8 && py >= 8 && py <= 15) {
+                setPixel(tx, ty, px, py, 45 + n * 20, 135 + n * 30, 35 + n * 15, 255);
+            } else if ((px === 6 && py === 12) || (px === 9 && py === 11)) {
+                setPixel(tx, ty, px, py, 55 + n * 20, 145 + n * 30, 40 + n * 15, 255);
+            }
+        });
+
+        // 47. FLOWER_YELLOW (Golden dandelion on green stem)
+        fillTile(TILES.FLOWER_YELLOW, (tx, ty, px, py) => {
+            if (typeof ctx.clearRect === 'function' && px === 0 && py === 0) {
+                ctx.clearRect(tx * 16, ty * 16, 16, 16);
+            }
+            const n = rnd();
+            const dx = px - 7.5;
+            const dy = py - 5.5;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 1.3) {
+                setPixel(tx, ty, px, py, 240, 165, 15, 255);
+            } else if (dist < 3.4) {
+                setPixel(tx, ty, px, py, 250, 225 + n * 30, 35 + n * 25, 255);
+            } else if (px >= 7 && px <= 8 && py >= 8 && py <= 15) {
+                setPixel(tx, ty, px, py, 50 + n * 20, 140 + n * 30, 35 + n * 15, 255);
+            } else if ((px === 6 && py === 13) || (px === 9 && py === 12)) {
+                setPixel(tx, ty, px, py, 60 + n * 20, 150 + n * 30, 40 + n * 15, 255);
+            }
+        });
+
+        // 48. TALL_GRASS (Lush swaying grass blades)
+        fillTile(TILES.TALL_GRASS, (tx, ty, px, py) => {
+            if (typeof ctx.clearRect === 'function' && px === 0 && py === 0) {
+                ctx.clearRect(tx * 16, ty * 16, 16, 16);
+            }
+            const n = rnd();
+            const bladeHeight = 4 + ((px * 7 + 3) % 9);
+            const isBladeCol = (px % 2 === 1 && px >= 1 && px <= 14);
+            if (isBladeCol && py >= bladeHeight) {
+                setPixel(tx, ty, px, py, 60 + n * 35, 135 + n * 45, 30 + n * 20, 245);
+            } else if (py >= 13 && px >= 2 && px <= 13 && rnd() > 0.35) {
+                setPixel(tx, ty, px, py, 50 + n * 30, 120 + n * 35, 25 + n * 15, 245);
+            }
+        });
+
+        // 49. PICKAXE_DIAMOND (Cyan diamond pickaxe head + wooden handle)
+        fillTile(TILES.PICKAXE_DIAMOND, (tx, ty, px, py) => {
+            if (typeof ctx.clearRect === 'function' && px === 0 && py === 0) {
+                ctx.clearRect(tx * 16, ty * 16, 16, 16);
+            }
+            const n = rnd();
+            const isHandle = (Math.abs((15 - py) - px) <= 1 && px >= 2 && px <= 11 && py >= 4 && py <= 13);
+            const isHead = (py >= 2 && py <= 4 && px >= 7 && px <= 13) ||
+                           (px >= 11 && px <= 13 && py >= 2 && py <= 8) ||
+                           (px === 6 && py === 3) || (px === 12 && py === 9);
+            if (isHead) {
+                setPixel(tx, ty, px, py, 70 + n * 30, 235 + n * 20, 225 + n * 25, 255);
+            } else if (isHandle) {
+                setPixel(tx, ty, px, py, 145 + n * 20, 105 + n * 15, 55 + n * 10, 255);
+            }
+        });
+
+        // 50. SWORD_DIAMOND (Gleaming diamond blade + guard + hilt)
+        fillTile(TILES.SWORD_DIAMOND, (tx, ty, px, py) => {
+            if (typeof ctx.clearRect === 'function' && px === 0 && py === 0) {
+                ctx.clearRect(tx * 16, ty * 16, 16, 16);
+            }
+            const n = rnd();
+            const diag = (15 - py) - px;
+            const isBlade = (Math.abs(diag) <= 1 && px >= 5 && px <= 14 && py >= 1 && py <= 10);
+            const isGuard = (px + py >= 13 && px + py <= 15 && px >= 3 && px <= 8 && py >= 7 && py <= 12);
+            const isHilt = (Math.abs(diag) <= 1 && px >= 1 && px <= 4 && py >= 11 && py <= 14);
+            if (isGuard) {
+                setPixel(tx, ty, px, py, 45, 165, 160, 255);
+            } else if (isBlade) {
+                const isEdge = (Math.abs(diag) === 1);
+                if (isEdge) {
+                    setPixel(tx, ty, px, py, 55 + n * 20, 200 + n * 25, 195 + n * 25, 255);
+                } else {
+                    setPixel(tx, ty, px, py, 140 + n * 30, 250, 245, 255);
+                }
+            } else if (isHilt) {
+                setPixel(tx, ty, px, py, 140 + n * 20, 95 + n * 15, 50 + n * 10, 255);
+            }
+        });
+
         // 240..249: CRACK_0 through CRACK_9 (mining overlay)
         // Progressive crack stages starting from center (8, 8) branching outward
         const crackStages = Array.from({ length: 16 }, () => new Array(16).fill(255));
@@ -1261,6 +1561,50 @@
         return canvas;
     }
 
+    /**
+     * Animates the WATER and LAVA tiles in the texture atlas canvas over time.
+     */
+    function updateAnimatedTextures(canvas, timeSeconds = 0) {
+        if (!canvas || typeof canvas.getContext !== 'function') return false;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return false;
+
+        // 1. Animate WATER tile (index 13)
+        const wTx = TILES.WATER % 16;
+        const wTy = Math.floor(TILES.WATER / 16);
+        for (let py = 0; py < 16; py++) {
+            for (let px = 0; px < 16; px++) {
+                const wave = Math.sin(px * 0.55 + timeSeconds * 3.0) * 0.5 + Math.cos(py * 0.65 - timeSeconds * 2.4) * 0.5;
+                const crest = wave > 0.45 ? 18 : (wave < -0.45 ? -12 : 0);
+                const r = Math.max(20, Math.min(95, 45 + crest));
+                const g = Math.max(70, Math.min(165, 105 + crest * 1.4));
+                const b = Math.max(180, Math.min(255, 225 + crest));
+                ctx.fillStyle = `rgba(${Math.round(r)},${Math.round(g)},${Math.round(b)},0.78)`;
+                ctx.fillRect(wTx * 16 + px, wTy * 16 + py, 1, 1);
+            }
+        }
+
+        // 2. Animate LAVA tile (index 41)
+        const lTx = TILES.LAVA % 16;
+        const lTy = Math.floor(TILES.LAVA / 16);
+        for (let py = 0; py < 16; py++) {
+            for (let px = 0; px < 16; px++) {
+                const heat = (Math.sin(px * 0.6 + timeSeconds * 1.8) + Math.cos(py * 0.5 - timeSeconds * 1.5)) * 0.25 + 0.5;
+                let r, g, b;
+                if (heat > 0.68) {
+                    r = 255; g = 230; b = 65;
+                } else if (heat > 0.38) {
+                    r = 248; g = 135; b = 20;
+                } else {
+                    r = 195; g = 50; b = 12;
+                }
+                ctx.fillStyle = `rgb(${r},${g},${b})`;
+                ctx.fillRect(lTx * 16 + px, lTy * 16 + py, 1, 1);
+            }
+        }
+        return true;
+    }
+
     const CRAFTING_RECIPES = [
         {
             id: 'planks_oak',
@@ -1279,6 +1623,36 @@
             name: 'Crafting Table',
             output: { id: BLOCKS.CRAFTING_TABLE, count: 1 },
             ingredients: [{ id: BLOCKS.PLANKS, count: 4 }]
+        },
+        {
+            id: 'torch',
+            name: 'Torches (x4)',
+            output: { id: BLOCKS.TORCH, count: 4 },
+            ingredients: [{ id: BLOCKS.COAL_ORE, count: 1 }, { id: BLOCKS.PLANKS, count: 1 }]
+        },
+        {
+            id: 'bed',
+            name: 'Bed (Spánek & Spawn)',
+            output: { id: BLOCKS.BED, count: 1 },
+            ingredients: [{ id: BLOCKS.SNOW, count: 2 }, { id: BLOCKS.PLANKS, count: 2 }]
+        },
+        {
+            id: 'ladder',
+            name: 'Ladder (x3)',
+            output: { id: BLOCKS.LADDER, count: 3 },
+            ingredients: [{ id: BLOCKS.PLANKS, count: 2 }]
+        },
+        {
+            id: 'pickaxe_diamond',
+            name: 'Diamond Pickaxe (3.5x Těžba)',
+            output: { id: BLOCKS.PICKAXE_DIAMOND, count: 1 },
+            ingredients: [{ id: BLOCKS.DIAMOND_ORE, count: 2 }, { id: BLOCKS.PLANKS, count: 1 }]
+        },
+        {
+            id: 'sword_diamond',
+            name: 'Diamond Sword (12 DMG)',
+            output: { id: BLOCKS.SWORD_DIAMOND, count: 1 },
+            ingredients: [{ id: BLOCKS.DIAMOND_ORE, count: 1 }, { id: BLOCKS.PLANKS, count: 1 }]
         },
         {
             id: 'bookshelf',
@@ -1331,6 +1705,7 @@
         CRAFTING_RECIPES,
         getBlockFaceTexture,
         getTileUV,
-        createTextureAtlasCanvas
+        createTextureAtlasCanvas,
+        updateAnimatedTextures
     };
 }));

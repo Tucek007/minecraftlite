@@ -192,6 +192,19 @@
             return Blocks.BLOCK_DEFS[blockId].solid;
         }
 
+        isTargetable(x, y, z) {
+            const blockId = this.getBlock(x, y, z);
+            if (!blockId || !Blocks || !Blocks.BLOCK_DEFS[blockId]) return false;
+            const def = Blocks.BLOCK_DEFS[blockId];
+            return Boolean(def.solid || def.targetable);
+        }
+
+        isClimbable(x, y, z) {
+            const blockId = this.getBlock(x, y, z);
+            if (!blockId || !Blocks || !Blocks.BLOCK_DEFS[blockId]) return false;
+            return Boolean(Blocks.BLOCK_DEFS[blockId].climbable);
+        }
+
         isTransparent(x, y, z) {
             const blockId = this.getBlock(x, y, z);
             if (!blockId) return true;
@@ -235,7 +248,8 @@
                 AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, COBBLESTONE: 4, WOOD: 5,
                 LEAVES: 6, PLANKS: 7, BRICK: 8, SAND: 9, GLASS: 10, WATER: 11,
                 COAL_ORE: 12, IRON_ORE: 13, BEDROCK: 14, GOLD_ORE: 18, DIAMOND_ORE: 19, SNOW: 20,
-                GRAVEL: 25, CRAFTING_TABLE: 26, JACK_O_LANTERN: 27, BIRCH_WOOD: 28, BIRCH_LEAVES: 29, LAVA: 30
+                GRAVEL: 25, CRAFTING_TABLE: 26, JACK_O_LANTERN: 27, BIRCH_WOOD: 28, BIRCH_LEAVES: 29, LAVA: 30,
+                TORCH: 31, BED: 32, LADDER: 33, FLOWER_RED: 34, FLOWER_YELLOW: 35, TALL_GRASS: 36
             };
 
             const treesToPlant = [];
@@ -432,13 +446,28 @@
                         }
                     }
 
-                    // Pumpkin: plains or forest, height > SEA_LEVEL + 2
-                    if (pumpkinBlock && (biome === 'plains' || biome === 'forest') && height > SEA_LEVEL + 2) {
-                        const pumpkinHash = Math.sin(this.seed * 5.19 + wx * 31.41 + wz * 59.26) * 43758.5453;
-                        const pumpkinRand = pumpkinHash - Math.floor(pumpkinHash);
-                        if (pumpkinRand < 0.002) {
-                            if (chunk.getBlock(lx, height, lz) === B.GRASS && chunk.getBlock(lx, height + 1, lz) === 0 && height + 1 < CHUNK_HEIGHT) {
-                                chunk.setBlock(lx, height + 1, lz, pumpkinBlock);
+                    // Pumpkin & Flora: plains or forest, height > SEA_LEVEL + 2
+                    if ((biome === 'plains' || biome === 'forest') && height > SEA_LEVEL + 2) {
+                        if (pumpkinBlock) {
+                            const pumpkinHash = Math.sin(this.seed * 5.19 + wx * 31.41 + wz * 59.26) * 43758.5453;
+                            const pumpkinRand = pumpkinHash - Math.floor(pumpkinHash);
+                            if (pumpkinRand < 0.002) {
+                                if (chunk.getBlock(lx, height, lz) === B.GRASS && chunk.getBlock(lx, height + 1, lz) === 0 && height + 1 < CHUNK_HEIGHT) {
+                                    chunk.setBlock(lx, height + 1, lz, pumpkinBlock);
+                                }
+                            }
+                        }
+
+                        // Lush Meadow Flora (Tall Grass, Red Poppy, Yellow Dandelion)
+                        if (chunk.getBlock(lx, height, lz) === B.GRASS && chunk.getBlock(lx, height + 1, lz) === 0 && height + 1 < CHUNK_HEIGHT) {
+                            const floraHash = Math.sin(this.seed * 9.37 + wx * 53.71 + wz * 97.13) * 43758.5453;
+                            const floraRand = floraHash - Math.floor(floraHash);
+                            if (B.FLOWER_RED && floraRand < 0.012) {
+                                chunk.setBlock(lx, height + 1, lz, B.FLOWER_RED);
+                            } else if (B.FLOWER_YELLOW && floraRand >= 0.012 && floraRand < 0.024) {
+                                chunk.setBlock(lx, height + 1, lz, B.FLOWER_YELLOW);
+                            } else if (B.TALL_GRASS && floraRand >= 0.024 && floraRand < 0.095) {
+                                chunk.setBlock(lx, height + 1, lz, B.TALL_GRASS);
                             }
                         }
                     }
@@ -491,6 +520,45 @@
                         const targetColors = isWater ? waterColors : colors;
 
                         const wz = czWorld + lz;
+                        const selfDef = (Blocks && Blocks.BLOCK_DEFS) ? Blocks.BLOCK_DEFS[blockId] : null;
+                        const selfEmits = !!(selfDef && selfDef.lightLevel > 0);
+
+                        // X-Mesh crossed diagonal billboards for flowers, tall grass, and torches
+                        if (selfDef && selfDef.crossMesh) {
+                            const tileIdx = Blocks.getBlockFaceTexture(blockId, 0);
+                            const { u0, v0, u1, v1 } = Blocks.getTileUV(tileIdx);
+                            const cShade = selfEmits ? 1.0 : 0.92;
+                            const x0 = wx + 0.15, x1 = wx + 0.85;
+                            const y0 = ly,        y1 = ly + 0.90;
+                            const z0 = wz + 0.15, z1 = wz + 0.85;
+
+                            const crossQuads = [
+                                [x0, y0, z0,  x1, y0, z1,  x1, y1, z1,  x0, y1, z0,   0.707, 0, -0.707],
+                                [x1, y0, z1,  x0, y0, z0,  x0, y1, z0,  x1, y1, z1,  -0.707, 0,  0.707],
+                                [x0, y0, z1,  x1, y0, z0,  x1, y1, z0,  x0, y1, z1,   0.707, 0,  0.707],
+                                [x1, y0, z0,  x0, y0, z1,  x0, y1, z1,  x1, y1, z0,  -0.707, 0, -0.707]
+                            ];
+
+                            for (const q of crossQuads) {
+                                targetPos.push(
+                                    q[0], q[1], q[2],
+                                    q[3], q[4], q[5],
+                                    q[6], q[7], q[8],
+                                    q[0], q[1], q[2],
+                                    q[6], q[7], q[8],
+                                    q[9], q[10], q[11]
+                                );
+                                targetUvs.push(
+                                    u0, v0, u1, v0, u1, v1,
+                                    u0, v0, u1, v1, u0, v1
+                                );
+                                for (let k = 0; k < 6; k++) {
+                                    targetNorm.push(q[12], q[13], q[14]);
+                                    targetColors.push(cShade, cShade, cShade);
+                                }
+                            }
+                            continue;
+                        }
 
                         // Check 6 adjacent neighbors (pass false to avoid cascading chunk creation)
                         // 0: +X, 1: -X, 2: +Y, 3: -Y, 4: +Z, 5: -Z
@@ -502,9 +570,6 @@
                             this.getBlock(wx, ly, wz + 1, false),
                             this.getBlock(wx, ly, wz - 1, false)
                         ];
-
-                        const selfDef = (Blocks && Blocks.BLOCK_DEFS) ? Blocks.BLOCK_DEFS[blockId] : null;
-                        const selfEmits = !!(selfDef && selfDef.lightLevel > 0);
 
                         for (let f = 0; f < 6; f++) {
                             const nBlock = neighbors[f];
@@ -528,7 +593,7 @@
                             const neighborEmits = !!(nDef && nDef.lightLevel > 0);
                             let shade = faceShades[f];
                             if (neighborEmits) {
-                                shade = Math.min(1.0, shade * 1.25);
+                                shade = Math.min(1.0, shade * 1.32);
                             }
 
                             // Vertex coordinates for 6 faces

@@ -726,7 +726,193 @@
             }, duration);
         }
 
-        update(dt) {
+        triggerDamageFlash() {
+            if (typeof document === 'undefined') return;
+            const el = this.damageVignetteEl || document.getElementById('damage-vignette');
+            if (!el) return;
+            this.damageVignetteEl = el;
+            if (el.classList) el.classList.add('active');
+            clearTimeout(this.damageFlashTimer);
+            this.damageFlashTimer = setTimeout(() => {
+                if (el.classList) el.classList.remove('active');
+            }, 320);
+        }
+
+        triggerSleepFade() {
+            if (typeof document === 'undefined') return;
+            const el = this.sleepOverlayEl || document.getElementById('sleep-overlay');
+            if (!el) return;
+            this.sleepOverlayEl = el;
+            if (el.classList) el.classList.add('active');
+            clearTimeout(this.sleepFadeTimer);
+            this.sleepFadeTimer = setTimeout(() => {
+                if (el.classList) el.classList.remove('active');
+            }, 900);
+        }
+
+        updateWeatherUI(weatherState) {
+            this.weatherState = weatherState || 'clear';
+            if (typeof document === 'undefined') return;
+            const weatherBtn = document.getElementById('btn-weather');
+            const minimapWeather = document.getElementById('minimap-weather');
+            let label = 'Jasno ☀️';
+            let icon = '☀️';
+            if (this.weatherState === 'rain') {
+                label = 'Déšť / Sníh 🌧️';
+                icon = '🌧️';
+            } else if (this.weatherState === 'thunder') {
+                label = 'Bouřka ⛈️';
+                icon = '⛈️';
+            }
+            if (weatherBtn) weatherBtn.innerText = `Počasí: ${label}`;
+            if (minimapWeather) minimapWeather.innerText = icon;
+        }
+
+        updateMusicUI(musicEnabled) {
+            if (typeof document === 'undefined') return;
+            const musicBtn = document.getElementById('btn-music');
+            if (musicBtn) {
+                musicBtn.innerText = `Ambientní hudba: ${musicEnabled ? 'ZAP 🎵' : 'VYP 🔇'}`;
+            }
+        }
+
+        updateMinimap(dayTime = 0.25, weatherState = 'clear', mobs = null) {
+            if (typeof document === 'undefined' || !this.player || !this.world) return;
+
+            const timeEl = this.minimapTimeEl || document.getElementById('minimap-time');
+            const weatherEl = this.minimapWeatherEl || document.getElementById('minimap-weather');
+            const footerEl = this.minimapFooterEl || document.getElementById('minimap-footer');
+            const canvas = this.minimapCanvasEl || document.getElementById('minimap-canvas');
+
+            if (timeEl) {
+                this.minimapTimeEl = timeEl;
+                // Convert dayTime (0=dawn 06:00, 0.25=noon 12:00, 0.5=dusk 18:00, 0.75=midnight 00:00)
+                const totalHours = (((dayTime + 0.25) % 1) * 24);
+                const hh = String(Math.floor(totalHours)).padStart(2, '0');
+                const mm = String(Math.floor((totalHours % 1) * 60)).padStart(2, '0');
+                const isDay = Math.sin(dayTime * Math.PI * 2) >= -0.05;
+                timeEl.innerText = `${isDay ? '☀️' : '🌙'} ${hh}:${mm}`;
+            }
+
+            if (weatherEl) {
+                this.minimapWeatherEl = weatherEl;
+                let wIcon = '☀️';
+                if (weatherState === 'rain') wIcon = '🌧️';
+                else if (weatherState === 'thunder') wIcon = '⛈️';
+                weatherEl.innerText = wIcon;
+            }
+
+            const px = Math.floor(this.player.position.x);
+            const pz = Math.floor(this.player.position.z);
+            const biome = typeof this.world.getBiome === 'function' ? this.world.getBiome(px, pz) : 'plains';
+
+            if (footerEl) {
+                this.minimapFooterEl = footerEl;
+                const biomeLabels = {
+                    plains: 'Pláně',
+                    forest: 'Les',
+                    desert: 'Poušť',
+                    mountains: 'Hory'
+                };
+                const bName = biomeLabels[biome] || String(biome);
+                footerEl.innerText = `${bName} (${px}, ${pz})`;
+            }
+
+            if (!canvas || typeof canvas.getContext !== 'function') return;
+            this.minimapCanvasEl = canvas;
+
+            // Throttle pixel rendering slightly (~12 FPS) for crisp performance
+            const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+            if (this.lastMinimapDraw && now - this.lastMinimapDraw < 80) return;
+            this.lastMinimapDraw = now;
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const w = canvas.width || 96;
+            const h = canvas.height || 96;
+            const radius = 24; // 48x48 blocks area
+            const cellSize = w / (radius * 2);
+
+            ctx.fillStyle = '#101824';
+            ctx.fillRect(0, 0, w, h);
+
+            const B = Blocks && Blocks.BLOCKS ? Blocks.BLOCKS : {};
+            for (let dz = -radius; dz < radius; dz++) {
+                for (let dx = -radius; dx < radius; dx++) {
+                    const wx = px + dx;
+                    const wz = pz + dz;
+                    let topY = typeof this.world.getHighestBlockY === 'function' ? this.world.getHighestBlockY(wx, wz) : 12;
+                    let bId = typeof this.world.getBlock === 'function' ? this.world.getBlock(wx, topY, wz) : 1;
+
+                    // Descend through non-solid flora/air to color terrain underneath unless flower/torch
+                    if ((bId === 0 || bId === B.TALL_GRASS) && topY > 1) {
+                        bId = this.world.getBlock(wx, topY - 1, wz);
+                    }
+
+                    let r = 88, gCol = 158, bCol = 62;
+                    if (bId === B.WATER || bId === 11) { r = 38; gCol = 98; bCol = 210; }
+                    else if (bId === B.SAND || bId === 9 || bId === B.SANDSTONE || bId === 24) { r = 222; gCol = 204; bCol = 132; }
+                    else if (bId === B.SNOW || bId === 13 || bId === B.ICE || bId === 20) { r = 235; gCol = 245; bCol = 255; }
+                    else if (bId === B.LEAVES || bId === 6 || bId === B.CACTUS || bId === 19) { r = 42; gCol = 112; bCol = 36; }
+                    else if (bId === B.STONE || bId === 3 || bId === B.COBBLESTONE || bId === 4 || bId === B.GRAVEL || bId === 17) { r = 128; gCol = 128; bCol = 132; }
+                    else if (bId === B.LAVA || bId === 27) { r = 255; gCol = 92; bCol = 20; }
+                    else if (bId === B.FLOWER_RED || bId === 34) { r = 235; gCol = 48; bCol = 48; }
+                    else if (bId === B.FLOWER_YELLOW || bId === 35 || bId === B.TORCH || bId === 31) { r = 255; gCol = 225; bCol = 55; }
+                    else if (bId === B.WOOD || bId === 5 || bId === B.PLANKS || bId === 7) { r = 148; gCol = 108; bCol = 62; }
+                    else if (bId === B.BRICK || bId === 8 || bId === B.TNT || bId === 15 || bId === B.BED || bId === 32) { r = 190; gCol = 64; bCol = 54; }
+
+                    // Subtle height shading
+                    const shade = Math.max(0.65, Math.min(1.25, 0.8 + (topY - 12) * 0.018));
+                    const fr = Math.min(255, Math.floor(r * shade));
+                    const fg = Math.min(255, Math.floor(gCol * shade));
+                    const fb = Math.min(255, Math.floor(bCol * shade));
+
+                    ctx.fillStyle = `rgb(${fr},${fg},${fb})`;
+                    ctx.fillRect((dx + radius) * cellSize, (dz + radius) * cellSize, Math.ceil(cellSize), Math.ceil(cellSize));
+                }
+            }
+
+            // Draw nearby mobs
+            if (Array.isArray(mobs)) {
+                for (let i = 0; i < mobs.length; i++) {
+                    const m = mobs[i];
+                    if (!m || !m.position || m.dead) continue;
+                    const mdx = m.position.x - this.player.position.x;
+                    const mdz = m.position.z - this.player.position.z;
+                    if (Math.abs(mdx) < radius && Math.abs(mdz) < radius) {
+                        const mx = (mdx + radius) * cellSize;
+                        const mz = (mdz + radius) * cellSize;
+                        ctx.fillStyle = m.hostile ? '#ff3333' : '#55ff55';
+                        ctx.fillRect(mx - 1.5, mz - 1.5, 3, 3);
+                    }
+                }
+            }
+
+            // Draw player arrow in center
+            const cx = w / 2;
+            const cy = h / 2;
+            if (typeof ctx.save === 'function') {
+                ctx.save();
+                if (typeof ctx.translate === 'function') ctx.translate(cx, cy);
+                if (typeof ctx.rotate === 'function') ctx.rotate(-this.player.yaw || 0);
+                ctx.fillStyle = '#ffffff';
+                if (typeof ctx.beginPath === 'function') {
+                    ctx.beginPath();
+                    ctx.moveTo(0, -4.5);
+                    ctx.lineTo(3.5, 3.5);
+                    ctx.lineTo(0, 1.8);
+                    ctx.lineTo(-3.5, 3.5);
+                    ctx.closePath();
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(-2, -2, 4, 4);
+                }
+                if (typeof ctx.restore === 'function') ctx.restore();
+            }
+        }
+
+        update(dt, dayTime = 0.25, weatherState = 'clear', mobs = null) {
             const now = performance.now();
             const frameFps = 1 / Math.max(0.001, dt);
             this.fpsHistory.push(frameFps);
@@ -747,6 +933,8 @@
                     this.updateGameMode(this.player.gameMode);
                 }
             }
+
+            this.updateMinimap(dayTime, weatherState, mobs);
 
             if (!this.debugVisible || !this.debugEl || !this.player || !this.world) return;
 
@@ -787,6 +975,7 @@
                 <div>Chunk: ${cx}, ${cz} in (16x16x64)</div>
                 <div>Facing: ${facing} (Yaw: ${yawDeg.toFixed(1)}°, Pitch: ${(-this.player.pitch * 180 / Math.PI).toFixed(1)}°)</div>
                 <div>Biome: ${String(biome).toUpperCase()}</div>
+                <div>Weather: ${String(weatherState).toUpperCase()}</div>
                 <div>Mode: ${this.gameMode.toUpperCase()}</div>
                 <div>Camera: ${cameraStr}</div>
                 <div>Oxygen: ${oxygenPct}%</div>

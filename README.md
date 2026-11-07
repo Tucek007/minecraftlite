@@ -33,13 +33,15 @@ Otevřete prohlížeč na adrese: **[http://localhost:8080/](http://localhost:80
 | **G** | **Přepínání herních režimů**: Survival ➔ Klidný (Peaceful) ➔ Kreativní (Creative) |
 | **F** | Přepnutí mezi módem **Survival** a **Creative Flying** (Létání) |
 | **F5** | **Přepínání pohledu kamery**: 1. osoba ➔ 3. osoba zezadu ➔ 3. osoba zepředu (3D model Steva) |
-| **E** | **Inventář a Crafting**: Otevření inventáře všech 30 bloků a výrobního stolu |
-| **Levé tlačítko myši** | **Boj / Těžení**: Útok na zaměřeného moba (dosah 4 bloky) / Progresivní těžení se zobrazením 3D prasklin (v Survivalu) / Okamžité ničení bloků (v Creative módu) |
-| **Pravé tlačítko myši** | **Položení / Interakce**: Položení vybraného bloku na stěnu / Otevření Crafting Table / Zapálení položeného TNT |
+| **R** | **Přepínání počasí**: Jasno ☀️ ➔ Déšť / Sněžení 🌧️ ➔ Bouřka s blesky ⛈️ |
+| **T** | **Posun denní doby**: Svítání (06:00) ➔ Poledne (12:00) ➔ Západ slunce (18:00) ➔ Půlnoc (00:00) |
+| **E** | **Inventář a Crafting**: Otevření inventáře všech 38 bloků/nástrojů a výrobního stolu |
+| **Levé tlačítko myši** | **Boj / Těžení**: Útok na zaměřeného moba (dosah 4 bloky, **Diamantový meč** dává 12 dmg) / Progresivní těžení se zobrazením 3D prasklin (**Diamantový krumpáč** těží 3.5× rychleji) / Okamžité ničení bloků (v Creative módu) |
+| **Pravé tlačítko myši** | **Položení / Interakce**: Položení vybraného bloku / Otevření Crafting Table / **Spánek v posteli (Bed)** (uloží Spawnpoint, uzdraví a přeskočí noc/bouřku) / Zapálení položeného TNT |
 | **Stisknutí kolečka myši (Middle Click)** | **Pick Block**: Okamžitý výběr zaměřeného bloku ze světa do aktivního slotu hotbaru |
 | **1 – 9 / Kolečko myši** | Výběr aktivního slotu v dolním Hotbaru |
-| **F3** | Přepnutí Minecraft Debug obrazovky (FPS, XYZ souřadnice, chunk, biom, rotace) |
-| **Esc** | Odemknutí myši a otevření Pauza menu (Uložení/Načtení/Nový svět, Nastavení FOV, Citlivosti a Render Distance) |
+| **F3** | Přepnutí Minecraft Debug obrazovky (FPS, XYZ souřadnice, chunk, biom, počasí, rotace) |
+| **Esc** | Odemknutí myši a otevření Pauza menu (Uložení/Načtení/Nový svět, Počasí, Ambientní hudba, Nastavení FOV, Citlivosti a Render Distance) |
 
 ---
 
@@ -96,84 +98,50 @@ Otevřete prohlížeč na adrese: **[http://localhost:8080/](http://localhost:80
 - Když se hráč přiblíží na vzdálenost menší než 2.2 bloku, předmět je magneticky přitažen k hráči.
 - Ve vzdálenosti pod 1.1 bloku hráč předmět sebere, přehraje se zvuk sebrání (`playPickup`) a surovina se přičte do inventáře pro další crafting.
 
-### 7. Dynamické 3D mraky (Volumetric Clouds)
+### 7. Dynamické 3D mraky, počasí a živá příroda
 - Oblohu ve výšce `y = 56` brázdí procedurální bloková pole polo-průhledných bílých mraků.
-- Mraky se plynule pohybují s větrem podél osy X a inteligentně se obalují kolem pozice hráče, takže vytvářejí dojem nekonečné živé oblohy.
+- **Dynamické počasí (klávesa `R`)**: přepínání mezi **Jasno**, **Déšť / Sněžení** (v horském biomu sněží vločky, v nížinách prší se zvukovou kulisou deště) a **Bouřka** (s blesky, hřměním a otřesem kamery).
+- **X-Mesh vegetace**: louky a lesy jsou porostlé 3D křížovou vegetací (**Rudá růže**, ** Pampeliška**, **Vysoká tráva**), kterou lze procházet i těžit.
+- **Animované textury a dynamické světlo v ruce**: voda i láva plynule animují své vlnění v atlasu textur, láva vystřeluje žhavé jiskry a držení **Pochodně (Torch)** nebo **Glowstonu** v ruce dynamicky osvětluje okolní jeskyně.
 
-### 8. Kompletní systém Craftingu a Crafting Table
-- Otevřením inventáře klávesou **E** nebo **kliknutím pravým tlačítkem myši na blok Crafting Table** ve světě se otevře přehledná výrobní nabídka.
-- **Dostupné recepty**:
-  - Dřevěná prkna (1x Dřevo ➔ 4x Prkna)
-  - Kámen (4x Cobblestone ➔ 4x Kámen)
-  - Cihly (2x Hlína + 2x Kámen ➔ 4x Cihly)
-  - Sklo (2x Písek ➔ 2x Sklo)
-  - Knihovna (3x Prkna ➔ 1x Knihovna)
-  - TNT (2x Písek + 2x Uhelná ruda ➔ 1x TNT)
-  - Glowstone (1x Zlatá ruda + 1x Sklo ➔ 1x Glowstone)
-  - Zarostlý kámen (2x Cobblestone + 2x Listí ➔ 2x Mossy Cobblestone)
-  - Jack o'Lantern (1x Dýně + 1x Glowstone ➔ 1x Jack o'Lantern)
-- V režimu Survival se kontrolují skutečně nasbírané suroviny; v Klidném a Kreativním režimu lze craftit volně bez omezení.
+### 8. Kompletní systém Craftingu, Nástroje a Interaktivní bloky
+- Otevřením inventáře klávesou **E** nebo **kliknutím pravým tlačítkem myši na blok Crafting Table** ve světě se otevře přehledná výrobní nabídka (14 receptů):
+  - Dřevěná prkna, Kámen, Cihly, Sklo, Knihovna, TNT, Glowstone, Zarostlý kámen, Crafting Table, Jack o'Lantern
+  - **Pochodeň (Torch x4)**: 1x Uhelná ruda + 1x Prkna (svítící křížový blok `lightLevel = 15`)
+  - **Postel (Bed x1)**: 3x Prkna + 2x Listí (pravým tlačítkem uloží **Spawnpoint**, uzdraví hráče a přeskočí noc či bouřku s plynulým stmíváním)
+  - **Žebřík (Ladder x3)**: 3x Prkna (umožňuje šplhání po stěnách pomocí `W` / `Space` a držení pozice pomocí `Shift`)
+  - **Diamantový krumpáč (Diamond Pickaxe x1)**: 2x Diamantová ruda + 1x Prkna (`3.5×` rychlejší těžba všech bloků v Survivalu)
+  - **Diamantový meč (Diamond Sword x1)**: 2x Diamantová ruda + 1x Prkna (`12 HP` poškození při útoku zblízka se zvukem švihnutí meče)
 
-### 9. Registr všech 30 typů bloků (`js/blocks.js`)
-1. **Grass Block** (Travnatý blok s biomovým zabarvením)
-2. **Dirt** (Hlína)
-3. **Stone** (Hladký kámen)
-4. **Cobblestone** (Dlažební kostky)
-5. **Oak Wood Log** (Dubové dřevo s letokruhy)
-6. **Oak Leaves** (Dubové listí s poloprůhledností)
-7. **Wooden Planks** (Dřevěná prkna)
-8. **Bricks** (Pálené cihly)
-9. **Sand** (Písek s gravitací)
-10. **Glass** (Průhledné sklo)
-11. **Water** (Tekoucí voda s průhledností a plaváním)
-12. **Coal Ore** (Uhelná ruda)
-13. **Iron Ore** (Železná ruda)
-14. **Bedrock** (Nezničitelné podloží)
-15. **TNT** (Zápalná výbušnina)
-16. **Bookshelf** (Knihovna plná knih)
-17. **Obsidian** (Extrémně tvrdý černofialový vulkanický kámen)
-18. **Gold Ore** (Zlatá ruda)
-19. **Diamond Ore** (Diamantová ruda)
-20. **Snow Block** (Sněhový blok z horských vrcholů)
-21. **Glowstone** (Svítící kámen, vyzařuje světlo)
-22. **Mossy Cobblestone** (Mechem obrostlý kámen z lesů)
-23. **Cactus** (Pouštní kaktus s kontaktním zraněním)
-24. **Pumpkin** (Dýně s vyřezaným obličejem)
-25. **Gravel** (Štěrk s gravitací)
-26. **Crafting Table** (Pracovní stůl s nářadím pro výrobu)
-27. **Jack o'Lantern** (Rozsvícená dýně vyzařující světlo)
-28. **Birch Wood Log** (Bříza s charakteristickou bílo-černou kůrou)
-29. **Birch Leaves** (Březové listí se světlým odstínem)
-30. **Lava** (Žhavá tekoucí láva s poškozením a světlem)
+### 9. Luxusní HUD, Minimapa a C418 Ambientní Soundtrack
+- **Živá 2D Minimapa a Kompas** v pravém horním rohu vykresluje okolní terén s výškovým stínováním, okolní moby (zeleně pasivní zvířata, červeně monstra), ukazatel směru pohledu hráče, denní hodiny (`☀️ 12:00` / `🌙 00:00`), ikonu počasí a aktuální biom.
+- **Game Feel (Juice)**: otřes kamery (Screen Shake) a červená viněta (`#damage-vignette`) při zranění či blízké explozi TNT/Creepera.
+- **C418 Ambientní klavírní hudba**: procedurální Web Audio generátor přehrává jemné pentatonické akordy s dlouhým dozvukem (lze přepnout v menu pauzy).
 
-### 10. Kyslík, potápění a zranění (`js/player.js`, `js/ui.js`)
+### 10. Registr všech 38 typů bloků a nástrojů (`js/blocks.js`)
+1–30: **Grass**, **Dirt**, **Stone**, **Cobblestone**, **Oak Wood**, **Oak Leaves**, **Planks**, **Brick**, **Sand**, **Glass**, **Water**, **Coal Ore**, **Iron Ore**, **Bedrock**, **TNT**, **Bookshelf**, **Obsidian**, **Gold Ore**, **Diamond Ore**, **Snow**, **Glowstone**, **Mossy Cobblestone**, **Cactus**, **Pumpkin**, **Gravel**, **Crafting Table**, **Jack o'Lantern**, **Birch Wood**, **Birch Leaves**, **Lava**
+31–38: **Torch (Pochodeň)**, **Bed (Postel)**, **Ladder (Žebřík)**, **Red Flower (Růže)**, **Yellow Flower (Pampeliška)**, **Tall Grass (Vysoká tráva)**, **Diamond Pickaxe (Diamantový krumpáč)**, **Diamond Sword (Diamantový meč)**
+
+### 11. Kyslík, potápění a zranění (`js/player.js`, `js/ui.js`)
 - Při ponoření hlavy pod hladinu vody se zobrazí 10 bublin kyslíku.
 - Kyslík postupně ubývá (15 sekund ponoru). Po vyčerpání začne hráč utonutím ztrácet 2 body zdraví za sekundu.
 - Při vynoření se bubliny doplňují a po 4 sekundách bez zranění se zdraví regeneruje.
 - Kaktusy i láva udělují kontaktní poškození při dotyku.
 
-### 11. Perzistence (Ukládání a načítání světa i hráče)
+### 12. Perzistence (Ukládání a načítání světa i hráče)
 - Tlačítko **Save World** i zavření okna prohlížeče automaticky ukládá:
   - Všechny provedené úpravy voxelového světa a seed.
-  - Pozici, rotaci kamery a aktivní slot hráče.
+  - Pozici, uložený **Spawnpoint (lůžko)**, rotaci kamery a aktivní slot hráče.
   - Sestavu hotbaru i přesné počty nasbíraných surovin v inventáři.
-  - Aktuální zdraví, zásobu kyslíku, herní režim a fázi dne/noci.
+  - Aktuální zdraví, zásobu kyslíku, herní režim, počasí a fázi dne/noci.
 
 ---
 
 ## 🧪 Automatizované testy
 
-Projekt obsahuje sadu jednotkových a integračních testů běžících v Node.js:
+Projekt obsahuje sadu jednotkových a integračních E2E testů běžících v Node.js:
 
 ```bash
 npm test
 ```
 
-Testované oblasti:
-- Deterministický výpočet Perlinova šumu a procedurálních biomů.
-- Registr všech 30 bloků, tvrdost, odolnost, gravitace, světelné úrovně a UV mapování včetně fází prasklin (CRACK_0..9).
-- AABB kolize, DDA raycasting, plížení, skoky a plavání.
-- Zdraví, kyslík, regenerace, kontaktní poškození a pád z výšky.
-- Výbuch TNT, tlaková vlna, knockback a gravitace sypkých bloků.
-- Mob AI logika, kolize mobů, poškození a bojový raycast.
-- Inventář, crafting recepty a perzistence do localStorage.
