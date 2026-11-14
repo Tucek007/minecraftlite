@@ -363,4 +363,75 @@ describe('World and Chunk tests', () => {
             }
         }
     });
+
+    test('Doors toggle passability, getHighestBlockY finds surface, water top is lowered, and torch emits warm RGB light', () => {
+        const world = new World.VoxelWorld(4289);
+        const chunk = new World.Chunk(0, 0);
+        chunk.setBlock(5, 20, 5, Blocks.BLOCKS.STONE);
+        chunk.setBlock(5, 21, 5, Blocks.BLOCKS.DOOR_OAK);
+        chunk.setBlock(5, 22, 5, Blocks.BLOCKS.DOOR_OAK);
+        chunk.setBlock(8, 20, 8, Blocks.BLOCKS.WATER);
+        chunk.setBlock(10, 20, 10, Blocks.BLOCKS.STONE);
+        chunk.setBlock(10, 21, 10, Blocks.BLOCKS.TORCH);
+        world.chunks.set(world.getChunkKey(0, 0), chunk);
+
+        assert.strictEqual(world.getHighestBlockY(5, 5), 22);
+        assert.strictEqual(world.isSolid(5, 21, 5), true, 'Closed Oak Door is solid');
+        assert.strictEqual(world.toggleDoor(5, 21, 5), true, 'toggleDoor toggles door');
+        assert.strictEqual(world.isDoorOpen(5, 21, 5), true);
+        assert.strictEqual(world.isDoorOpen(5, 22, 5), true, 'Stacked top door half opens together');
+        assert.strictEqual(world.isSolid(5, 21, 5), false, 'Open Oak Door is passable');
+
+        const mockTHREE = {
+            Float32BufferAttribute: class { constructor(array, itemSize) { this.array = array; this.itemSize = itemSize; } },
+            BufferGeometry: class { constructor() { this.attributes = {}; } setAttribute(n, a) { this.attributes[n] = a; } dispose() {} },
+            MeshLambertMaterial: class { constructor(opts) { Object.assign(this, opts); } dispose() {} },
+            Mesh: class { constructor(geo, mat) { this.geometry = geo; this.material = mat; this.parent = null; } }
+        };
+        world.buildChunkMesh(chunk, mockTHREE, {});
+
+        assert.ok(chunk.waterMesh, 'Water block creates translucent waterMesh');
+        const waterPos = chunk.waterMesh.geometry.attributes.position.array;
+        const maxWaterY = Math.max(...waterPos.filter((_, i) => i % 3 === 1));
+        assert.ok(Math.abs(maxWaterY - 20.88) < 0.01, `Non-submerged water top must sit at ly + 0.88 (20.88), got ${maxWaterY}`);
+
+        // Torch emits warm RGB vertex color (r >= b) on nearby stone
+        const solidColors = chunk.mesh.geometry.attributes.color.array;
+        let foundWarmTint = false;
+        for (let i = 0; i < solidColors.length; i += 3) {
+            if (solidColors[i] > solidColors[i + 2] + 0.05) {
+                foundWarmTint = true;
+                break;
+            }
+        }
+        assert.strictEqual(foundWarmTint, true, 'Nearby torch should apply warm amber RGB lighting to adjacent blocks');
+    });
+
+    test('Deterministic village generator spawns village structures in suitable plains chunks', () => {
+        let foundVillage = null;
+        for (let s = 1; s <= 15 && !foundVillage; s++) {
+            const world = new World.VoxelWorld(s * 100 + 7);
+            for (let cx = -3; cx <= 3 && !foundVillage; cx++) {
+                for (let cz = -3; cz <= 3 && !foundVillage; cz++) {
+                    world.getOrCreateChunk(cx, cz);
+                    if (world.villages.length > 0) {
+                        foundVillage = { world, village: world.villages[0] };
+                    }
+                }
+            }
+        }
+        assert.ok(foundVillage, 'At least one deterministic village must generate across explored plains/forest chunks');
+        const chunk = foundVillage.world.getChunk(foundVillage.village.cx, foundVillage.village.cz, false);
+        let hasWheat = false;
+        let hasFurnace = false;
+        let hasEnchant = false;
+        for (let i = 0; i < chunk.voxels.length; i++) {
+            if (chunk.voxels[i] === Blocks.BLOCKS.WHEAT) hasWheat = true;
+            if (chunk.voxels[i] === Blocks.BLOCKS.FURNACE) hasFurnace = true;
+            if (chunk.voxels[i] === Blocks.BLOCKS.ENCHANTING_TABLE) hasEnchant = true;
+        }
+        assert.ok(hasWheat, 'Generated village must contain irrigated WHEAT farm');
+        assert.ok(hasFurnace, 'Generated village must contain blacksmith FURNACE');
+        assert.ok(hasEnchant, 'Generated village must contain ENCHANTING_TABLE');
+    });
 });

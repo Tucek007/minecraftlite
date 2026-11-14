@@ -61,7 +61,7 @@ describe('Blocks module tests', () => {
         }
     });
 
-    test('Registry contains all 39 blocks (Air + 38 blocks, flora, and tools)', () => {
+    test('Registry contains all 52 blocks (Air + 51 blocks, flora, food, and tools)', () => {
         const expectedBlocks = [
             'AIR', 'GRASS', 'DIRT', 'STONE', 'COBBLESTONE',
             'WOOD', 'LEAVES', 'PLANKS', 'BRICK', 'SAND',
@@ -70,9 +70,12 @@ describe('Blocks module tests', () => {
             'SNOW', 'GLOWSTONE', 'MOSSY_COBBLESTONE', 'CACTUS', 'PUMPKIN',
             'GRAVEL', 'CRAFTING_TABLE', 'JACK_O_LANTERN', 'BIRCH_WOOD', 'BIRCH_LEAVES', 'LAVA',
             'TORCH', 'BED', 'LADDER', 'FLOWER_RED', 'FLOWER_YELLOW', 'TALL_GRASS',
-            'PICKAXE_DIAMOND', 'SWORD_DIAMOND'
+            'PICKAXE_DIAMOND', 'SWORD_DIAMOND',
+            'EMERALD_ORE', 'EMERALD_BLOCK', 'FURNACE', 'ENCHANTING_TABLE', 'CHEST',
+            'FARMLAND', 'WHEAT', 'STONE_BRICKS', 'LANTERN', 'DOOR_OAK',
+            'BREAD', 'GOLDEN_APPLE', 'BOW'
         ];
-        assert.strictEqual(Object.keys(Blocks.BLOCKS).length, 39);
+        assert.strictEqual(Object.keys(Blocks.BLOCKS).length, 52);
         for (const name of expectedBlocks) {
             assert.ok(name in Blocks.BLOCKS, `Missing block key ${name}`);
             const id = Blocks.BLOCKS[name];
@@ -96,6 +99,14 @@ describe('Blocks module tests', () => {
         assert.strictEqual(Blocks.BLOCKS.TALL_GRASS, 36);
         assert.strictEqual(Blocks.BLOCKS.PICKAXE_DIAMOND, 37);
         assert.strictEqual(Blocks.BLOCKS.SWORD_DIAMOND, 38);
+        assert.strictEqual(Blocks.BLOCKS.EMERALD_ORE, 39);
+        assert.strictEqual(Blocks.BLOCKS.FURNACE, 41);
+        assert.strictEqual(Blocks.BLOCKS.ENCHANTING_TABLE, 42);
+        assert.strictEqual(Blocks.BLOCKS.LANTERN, 47);
+        assert.strictEqual(Blocks.BLOCKS.DOOR_OAK, 48);
+        assert.strictEqual(Blocks.BLOCKS.BREAD, 49);
+        assert.strictEqual(Blocks.BLOCKS.GOLDEN_APPLE, 50);
+        assert.strictEqual(Blocks.BLOCKS.BOW, 51);
     });
 
     test('All block definitions have valid hardness values', () => {
@@ -138,7 +149,20 @@ describe('Blocks module tests', () => {
             FLOWER_YELLOW: 0.05,
             TALL_GRASS: 0.05,
             PICKAXE_DIAMOND: 0.5,
-            SWORD_DIAMOND: 0.5
+            SWORD_DIAMOND: 0.5,
+            EMERALD_ORE: 2.2,
+            EMERALD_BLOCK: 2.5,
+            FURNACE: 2.0,
+            ENCHANTING_TABLE: 3.0,
+            CHEST: 1.5,
+            FARMLAND: 0.7,
+            WHEAT: 0.15,
+            STONE_BRICKS: 1.6,
+            LANTERN: 0.4,
+            DOOR_OAK: 1.2,
+            BREAD: 0.2,
+            GOLDEN_APPLE: 0.2,
+            BOW: 0.5
         };
 
         for (const [name, expected] of Object.entries(expectedHardness)) {
@@ -296,6 +320,33 @@ describe('Blocks module tests', () => {
             assert.ok(Math.abs(uv.u1 - ((tileX + 1) / 16 - eps)) < 1e-6);
             assert.ok(Math.abs(uv.v0 - (1 - (tileY + 1) / 16 + eps)) < 1e-6);
             assert.ok(Math.abs(uv.v1 - (1 - tileY / 16 - eps)) < 1e-6);
+        }
+    });
+
+    test('SMELTING_RECIPES, ENCHANTMENTS, food/bow attributes, and new tile UVs 51..68', () => {
+        assert.ok(Array.isArray(Blocks.SMELTING_RECIPES) && Blocks.SMELTING_RECIPES.length >= 5);
+        for (const r of Blocks.SMELTING_RECIPES) {
+            assert.ok(r.output && r.output.id > 0);
+            assert.ok(Array.isArray(r.ingredients) && r.ingredients.length > 0);
+        }
+        assert.ok(Blocks.ENCHANTMENTS && Blocks.ENCHANTMENTS.efficiency && Blocks.ENCHANTMENTS.sharpness && Blocks.ENCHANTMENTS.flame);
+
+        const bread = Blocks.BLOCK_DEFS[Blocks.BLOCKS.BREAD];
+        assert.strictEqual(bread.isFood, true);
+        assert.strictEqual(bread.hungerRestore, 6);
+
+        const gApple = Blocks.BLOCK_DEFS[Blocks.BLOCKS.GOLDEN_APPLE];
+        assert.strictEqual(gApple.isFood, true);
+        assert.strictEqual(gApple.absorption, 4);
+
+        const bow = Blocks.BLOCK_DEFS[Blocks.BLOCKS.BOW];
+        assert.strictEqual(bow.isTool, true);
+        assert.strictEqual(bow.isBow, true);
+
+        for (let t = 51; t <= 68; t++) {
+            const uv = Blocks.getTileUV(t);
+            assert.ok(uv.u0 >= 0 && uv.u1 <= 1 && uv.v0 >= 0 && uv.v1 <= 1);
+            assert.ok(uv.u1 > uv.u0 && uv.v1 > uv.v0);
         }
     });
 });

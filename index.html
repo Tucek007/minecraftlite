@@ -82,35 +82,66 @@
             <div class="bubble"></div>
             <div class="bubble"></div>
         </div>
-        <div id="hearts-bar">
-            <div class="heart"></div>
-            <div class="heart"></div>
-            <div class="heart"></div>
-            <div class="heart"></div>
-            <div class="heart"></div>
-            <div class="heart"></div>
-            <div class="heart"></div>
-            <div class="heart"></div>
-            <div class="heart"></div>
-            <div class="heart"></div>
+        <div id="hud-stats-row" class="hud-stats-row">
+            <div id="hearts-bar">
+                <div class="heart"></div>
+                <div class="heart"></div>
+                <div class="heart"></div>
+                <div class="heart"></div>
+                <div class="heart"></div>
+                <div class="heart"></div>
+                <div class="heart"></div>
+                <div class="heart"></div>
+                <div class="heart"></div>
+                <div class="heart"></div>
+            </div>
+            <div id="hunger-bar" title="Hlad">
+                <div class="drumstick"></div>
+                <div class="drumstick"></div>
+                <div class="drumstick"></div>
+                <div class="drumstick"></div>
+                <div class="drumstick"></div>
+                <div class="drumstick"></div>
+                <div class="drumstick"></div>
+                <div class="drumstick"></div>
+                <div class="drumstick"></div>
+                <div class="drumstick"></div>
+            </div>
+        </div>
+        <div id="xp-bar-container" title="Zkušenosti (XP)">
+            <div id="xp-bar-fill"></div>
+            <div id="xp-level-badge">0</div>
         </div>
         <div id="hotbar"></div>
     </div>
 
-    <!-- Creative Block Inventory Overlay ('E') -->
+    <!-- Creative Block Inventory, Crafting, Furnace & Enchanting Overlay ('E') -->
     <div id="inventory-overlay" style="display: none;">
         <div class="inventory-box">
             <div class="inventory-header">
-                <span class="inventory-title">Creative Inventory &amp; Crafting</span>
+                <span class="inventory-title">Inventář, Crafting, Pec &amp; Enchanting</span>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <button type="button" id="btn-inv-gamemode" class="mc-btn small-btn">Režim: Survival</button>
                     <button type="button" id="btn-inventory-close" class="inventory-close-btn">&times;</button>
                 </div>
             </div>
             <div class="inventory-subtitle">Inventář všech bloků a nástrojů. Kliknutím vložíte do aktivního slotu hotbaru, nebo najeďte myší a stiskněte 1–9. Klávesa 'E' nebo Esc zavře okno.</div>
+            <div class="stations-tabs">
+                <button type="button" class="station-tab active" data-station="crafting">Crafting</button>
+                <button type="button" class="station-tab" data-station="smelting">Pec (Tavení)</button>
+                <button type="button" class="station-tab" data-station="enchanting">Enchanting (Očarování)</button>
+            </div>
             <div id="crafting-section" class="crafting-section">
                 <div class="crafting-header">Crafting (Výroba předmětů a výbavy) <span id="crafting-mode-hint" class="crafting-hint">V Klidném/Kreativním režimu lze kraftit zdarma bez surovin!</span></div>
                 <div id="crafting-grid" class="crafting-grid"></div>
+            </div>
+            <div id="smelting-section" class="crafting-section" style="display: none;">
+                <div class="crafting-header">Pec (Furnace — Tavení rud &amp; Pečení) <span class="crafting-hint" style="color: #ffaa44;">Vyžaduje uhlí nebo volný režim</span></div>
+                <div id="smelting-grid" class="crafting-grid"></div>
+            </div>
+            <div id="enchanting-section" class="crafting-section" style="display: none;">
+                <div class="crafting-header">Očarovávací stůl (Enchanting Table) <span id="enchant-xp-status" class="crafting-hint" style="color: #66e6ff;">Tvé XP: Level 0</span></div>
+                <div id="enchanting-grid" class="crafting-grid"></div>
             </div>
             <div id="inventory-grid" class="inventory-grid"></div>
             <div class="inventory-controls" style="margin-top: 10px; font-size: 11px; color: #888; display: flex; flex-wrap: wrap; gap: 14px; justify-content: center;">
@@ -118,8 +149,23 @@
                 <div><span class="key-badge">R</span> : Počasí (Jasno / Déšť / Bouřka)</div>
                 <div><span class="key-badge">T</span> : Posunout denní dobu</div>
                 <div><span class="key-badge">F5</span> : Pohled 3. osoby</div>
-                <div><span class="key-badge">Střední tl. myši</span> : Pick Block</div>
+                <div><span class="key-badge">Pravé tl. myši</span> : Obchod / Dveře / Pec / Truhla / Jídlo / Luk</div>
             </div>
+        </div>
+    </div>
+
+    <!-- Villager Trading Modal -->
+    <div id="trading-overlay" style="display: none;">
+        <div class="trading-box">
+            <div class="inventory-header">
+                <div>
+                    <span id="trading-villager-name" class="inventory-title">Vesničan</span>
+                    <span id="trading-villager-level" class="villager-level-badge">Úroveň 1 (Novic)</span>
+                </div>
+                <button type="button" id="btn-trading-close" class="inventory-close-btn">&times;</button>
+            </div>
+            <div id="trading-emerald-status" class="trading-emerald-status">Tvoje smaragdy: 0</div>
+            <div id="trading-list" class="trading-list"></div>
         </div>
     </div>
 

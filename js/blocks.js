@@ -50,7 +50,20 @@
         FLOWER_YELLOW: 35,
         TALL_GRASS: 36,
         PICKAXE_DIAMOND: 37,
-        SWORD_DIAMOND: 38
+        SWORD_DIAMOND: 38,
+        EMERALD_ORE: 39,
+        EMERALD_BLOCK: 40,
+        FURNACE: 41,
+        ENCHANTING_TABLE: 42,
+        CHEST: 43,
+        FARMLAND: 44,
+        WHEAT: 45,
+        STONE_BRICKS: 46,
+        LANTERN: 47,
+        DOOR_OAK: 48,
+        BREAD: 49,
+        GOLDEN_APPLE: 50,
+        BOW: 51
     };
 
     // Texture tile coordinates in 16x16 grid (index = tileY * 16 + tileX)
@@ -106,6 +119,24 @@
         TALL_GRASS: 48,
         PICKAXE_DIAMOND: 49,
         SWORD_DIAMOND: 50,
+        EMERALD_ORE: 51,
+        EMERALD_BLOCK: 52,
+        FURNACE_TOP: 53,
+        FURNACE_SIDE: 54,
+        FURNACE_FRONT: 55,
+        ENCHANT_TOP: 56,
+        ENCHANT_SIDE: 57,
+        CHEST_TOP: 58,
+        CHEST_SIDE: 59,
+        CHEST_FRONT: 60,
+        FARMLAND_TOP: 61,
+        WHEAT: 62,
+        STONE_BRICKS: 63,
+        LANTERN: 64,
+        DOOR_OAK: 65,
+        BREAD: 66,
+        GOLDEN_APPLE: 67,
+        BOW: 68,
         CRACK_0: 240,
         CRACK_1: 241,
         CRACK_2: 242,
@@ -633,6 +664,199 @@
             sound: 'stone',
             textures: {
                 all: TILES.SWORD_DIAMOND
+            }
+        },
+        [BLOCKS.EMERALD_ORE]: {
+            id: BLOCKS.EMERALD_ORE,
+            name: 'Emerald Ore',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            hardness: 2.2,
+            preferredTool: 'pickaxe',
+            sound: 'stone',
+            textures: {
+                all: TILES.EMERALD_ORE
+            }
+        },
+        [BLOCKS.EMERALD_BLOCK]: {
+            id: BLOCKS.EMERALD_BLOCK,
+            name: 'Emerald Block',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            hardness: 2.5,
+            preferredTool: 'pickaxe',
+            sound: 'stone',
+            textures: {
+                all: TILES.EMERALD_BLOCK
+            }
+        },
+        [BLOCKS.FURNACE]: {
+            id: BLOCKS.FURNACE,
+            name: 'Furnace',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            interactive: true,
+            lightLevel: 10,
+            hardness: 2.0,
+            preferredTool: 'pickaxe',
+            sound: 'stone',
+            textures: {
+                top: TILES.FURNACE_TOP,
+                bottom: TILES.FURNACE_TOP,
+                front: TILES.FURNACE_FRONT,
+                sides: TILES.FURNACE_SIDE
+            }
+        },
+        [BLOCKS.ENCHANTING_TABLE]: {
+            id: BLOCKS.ENCHANTING_TABLE,
+            name: 'Enchanting Table',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            interactive: true,
+            lightLevel: 12,
+            hardness: 3.0,
+            preferredTool: 'pickaxe',
+            sound: 'stone',
+            textures: {
+                top: TILES.ENCHANT_TOP,
+                bottom: TILES.OBSIDIAN,
+                sides: TILES.ENCHANT_SIDE
+            }
+        },
+        [BLOCKS.CHEST]: {
+            id: BLOCKS.CHEST,
+            name: 'Chest',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            interactive: true,
+            hardness: 1.5,
+            sound: 'wood',
+            textures: {
+                top: TILES.CHEST_TOP,
+                bottom: TILES.CHEST_TOP,
+                front: TILES.CHEST_FRONT,
+                sides: TILES.CHEST_SIDE
+            }
+        },
+        [BLOCKS.FARMLAND]: {
+            id: BLOCKS.FARMLAND,
+            name: 'Farmland',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            hardness: 0.7,
+            drop: BLOCKS.DIRT,
+            sound: 'dirt',
+            textures: {
+                top: TILES.FARMLAND_TOP,
+                bottom: TILES.DIRT,
+                sides: TILES.DIRT
+            }
+        },
+        [BLOCKS.WHEAT]: {
+            id: BLOCKS.WHEAT,
+            name: 'Wheat',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            crossMesh: true,
+            targetable: true,
+            hardness: 0.15,
+            sound: 'grass',
+            textures: {
+                all: TILES.WHEAT
+            }
+        },
+        [BLOCKS.STONE_BRICKS]: {
+            id: BLOCKS.STONE_BRICKS,
+            name: 'Stone Bricks',
+            solid: true,
+            transparent: false,
+            liquid: false,
+            hardness: 1.6,
+            preferredTool: 'pickaxe',
+            sound: 'stone',
+            textures: {
+                all: TILES.STONE_BRICKS
+            }
+        },
+        [BLOCKS.LANTERN]: {
+            id: BLOCKS.LANTERN,
+            name: 'Lantern',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            crossMesh: true,
+            targetable: true,
+            lightLevel: 15,
+            hardness: 0.4,
+            sound: 'stone',
+            textures: {
+                all: TILES.LANTERN
+            }
+        },
+        [BLOCKS.DOOR_OAK]: {
+            id: BLOCKS.DOOR_OAK,
+            name: 'Oak Door',
+            solid: true,
+            transparent: true,
+            liquid: false,
+            interactive: true,
+            hardness: 1.2,
+            sound: 'wood',
+            textures: {
+                all: TILES.DOOR_OAK
+            }
+        },
+        [BLOCKS.BREAD]: {
+            id: BLOCKS.BREAD,
+            name: 'Bread',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            isFood: true,
+            hungerRestore: 6,
+            healAmount: 4,
+            hardness: 0.2,
+            sound: 'grass',
+            textures: {
+                all: TILES.BREAD
+            }
+        },
+        [BLOCKS.GOLDEN_APPLE]: {
+            id: BLOCKS.GOLDEN_APPLE,
+            name: 'Golden Apple',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            isFood: true,
+            hungerRestore: 10,
+            healAmount: 10,
+            absorption: 4,
+            hardness: 0.2,
+            sound: 'grass',
+            textures: {
+                all: TILES.GOLDEN_APPLE
+            }
+        },
+        [BLOCKS.BOW]: {
+            id: BLOCKS.BOW,
+            name: 'Bow',
+            solid: false,
+            transparent: true,
+            liquid: false,
+            isTool: true,
+            isBow: true,
+            attackDamage: 3,
+            hardness: 0.5,
+            sound: 'wood',
+            textures: {
+                all: TILES.BOW
             }
         }
     };
@@ -1558,6 +1782,280 @@
             }
         }
 
+        // 51. EMERALD_ORE
+        fillTile(TILES.EMERALD_ORE, (tx, ty, px, py) => {
+            const isGem = ((px === 4 && py >= 4 && py <= 6) || (px === 5 && py >= 4 && py <= 5) ||
+                           (px === 10 && py >= 9 && py <= 12) || (px === 11 && py >= 10 && py <= 11) ||
+                           (px === 7 && py === 12) || (px === 8 && py === 12) ||
+                           (px === 11 && py === 3) || (px === 12 && py === 4));
+            const n = rnd();
+            if (isGem) {
+                const bright = ((px + py) % 2 === 0) ? 45 : 0;
+                setPixel(tx, ty, px, py, 20 + bright, 200 + bright, 85 + bright * 0.6);
+            } else {
+                const shade = 115 + n * 35;
+                setPixel(tx, ty, px, py, shade, shade, shade);
+            }
+        });
+
+        // 52. EMERALD_BLOCK
+        fillTile(TILES.EMERALD_BLOCK, (tx, ty, px, py) => {
+            const border = (px === 0 || py === 0 || px === 15 || py === 15);
+            const facet = (px >= 4 && px <= 11 && py >= 4 && py <= 11);
+            const highlight = (px === 2 || py === 2 || (px === 5 && py === 5));
+            const n = rnd();
+            if (border) {
+                setPixel(tx, ty, px, py, 20, 145, 58);
+            } else if (highlight) {
+                setPixel(tx, ty, px, py, 130, 250, 165);
+            } else if (facet) {
+                setPixel(tx, ty, px, py, 35 + n * 20, 210 + n * 25, 95 + n * 20);
+            } else {
+                setPixel(tx, ty, px, py, 25 + n * 15, 180 + n * 20, 72 + n * 15);
+            }
+        });
+
+        // 53. FURNACE_TOP
+        fillTile(TILES.FURNACE_TOP, (tx, ty, px, py) => {
+            const n = rnd();
+            const isRim = (px <= 1 || px >= 14 || py <= 1 || py >= 14);
+            const shade = isRim ? (130 + n * 20) : (95 + n * 30);
+            setPixel(tx, ty, px, py, shade, shade, shade);
+        });
+
+        // 54. FURNACE_SIDE
+        fillTile(TILES.FURNACE_SIDE, (tx, ty, px, py) => {
+            const n = rnd();
+            const isSeam = (py === 0 || py === 7 || py === 15 || ((py < 7 ? (px % 8 === 0) : ((px + 4) % 8 === 0))));
+            const shade = isSeam ? (78 + n * 15) : (120 + n * 28);
+            setPixel(tx, ty, px, py, shade, shade, shade);
+        });
+
+        // 55. FURNACE_FRONT
+        fillTile(TILES.FURNACE_FRONT, (tx, ty, px, py) => {
+            const n = rnd();
+            const isUpperVent = (px >= 3 && px <= 12 && py >= 3 && py <= 5);
+            const isFirebox = (px >= 4 && px <= 11 && py >= 9 && py <= 14);
+            if (isUpperVent) {
+                setPixel(tx, ty, px, py, 42 + n * 15, 42 + n * 15, 44 + n * 15);
+            } else if (isFirebox) {
+                setPixel(tx, ty, px, py, 240, 120 + n * 90, 25);
+            } else {
+                const isRim = (px === 0 || px === 15 || py === 0 || py === 15 || py === 7);
+                const shade = isRim ? 82 : (122 + n * 26);
+                setPixel(tx, ty, px, py, shade, shade, shade);
+            }
+        });
+
+        // 56. ENCHANT_TOP
+        fillTile(TILES.ENCHANT_TOP, (tx, ty, px, py) => {
+            const n = rnd();
+            const isCornerGem = ((px <= 2 || px >= 13) && (py <= 2 || py >= 13));
+            const isGoldTrim = ((px === 3 || px === 12) && py >= 3 && py <= 12) ||
+                               ((py === 3 || py === 12) && px >= 3 && px <= 12);
+            const isCloth = (px >= 4 && px <= 11 && py >= 4 && py <= 11);
+            if (isCornerGem) {
+                setPixel(tx, ty, px, py, 70, 230 + n * 20, 245);
+            } else if (isGoldTrim) {
+                setPixel(tx, ty, px, py, 235, 195, 55);
+            } else if (isCloth) {
+                const isRune = ((px + py) % 3 === 0 && px >= 5 && px <= 10 && py >= 5 && py <= 10);
+                if (isRune) setPixel(tx, ty, px, py, 245, 225, 110);
+                else setPixel(tx, ty, px, py, 160 + n * 20, 25, 38);
+            } else {
+                setPixel(tx, ty, px, py, 25 + n * 16, 16 + n * 10, 42 + n * 18);
+            }
+        });
+
+        // 57. ENCHANT_SIDE
+        fillTile(TILES.ENCHANT_SIDE, (tx, ty, px, py) => {
+            const n = rnd();
+            if (py <= 1 && (px <= 2 || px >= 13)) {
+                setPixel(tx, ty, px, py, 75, 235, 245); // diamond corners
+            } else if (py <= 4) {
+                setPixel(tx, ty, px, py, 165 + n * 15, 25, 35); // crimson drape
+            } else if (py === 5) {
+                setPixel(tx, ty, px, py, 235, 190, 50); // gold border
+            } else {
+                setPixel(tx, ty, px, py, 22 + n * 18, 14 + n * 10, 38 + n * 20); // obsidian base
+            }
+        });
+
+        // 58. CHEST_TOP
+        fillTile(TILES.CHEST_TOP, (tx, ty, px, py) => {
+            const n = rnd();
+            const isFrame = (px <= 1 || px >= 14 || py <= 1 || py >= 14);
+            if (isFrame) {
+                setPixel(tx, ty, px, py, 92 + n * 15, 58 + n * 10, 24);
+            } else {
+                setPixel(tx, ty, px, py, 168 + n * 22, 118 + n * 16, 56 + n * 10);
+            }
+        });
+
+        // 59. CHEST_SIDE
+        fillTile(TILES.CHEST_SIDE, (tx, ty, px, py) => {
+            const n = rnd();
+            const isFrame = (px <= 1 || px >= 14 || py <= 1 || py >= 14 || py === 5);
+            if (isFrame) {
+                setPixel(tx, ty, px, py, 85 + n * 15, 52 + n * 10, 20);
+            } else {
+                setPixel(tx, ty, px, py, 165 + n * 20, 115 + n * 16, 52 + n * 10);
+            }
+        });
+
+        // 60. CHEST_FRONT
+        fillTile(TILES.CHEST_FRONT, (tx, ty, px, py) => {
+            const n = rnd();
+            const isLatch = (px >= 7 && px <= 8 && py >= 4 && py <= 7);
+            const isFrame = (px <= 1 || px >= 14 || py <= 1 || py >= 14 || py === 5);
+            if (isLatch) {
+                setPixel(tx, ty, px, py, 210, 215, 225);
+            } else if (isFrame) {
+                setPixel(tx, ty, px, py, 85 + n * 15, 52 + n * 10, 20);
+            } else {
+                setPixel(tx, ty, px, py, 165 + n * 20, 115 + n * 16, 52 + n * 10);
+            }
+        });
+
+        // 61. FARMLAND_TOP
+        fillTile(TILES.FARMLAND_TOP, (tx, ty, px, py) => {
+            const n = rnd();
+            const isFurrow = (py % 4 === 0);
+            if (isFurrow) {
+                setPixel(tx, ty, px, py, 52 + n * 12, 30 + n * 8, 14);
+            } else {
+                setPixel(tx, ty, px, py, 84 + n * 18, 52 + n * 12, 26 + n * 8);
+            }
+        });
+
+        // 62. WHEAT
+        fillTile(TILES.WHEAT, (tx, ty, px, py) => {
+            const stalkCols = [2, 5, 8, 11, 14];
+            let isWheat = false;
+            let isEar = false;
+            for (const sc of stalkCols) {
+                if (px === sc && py >= 3) isWheat = true;
+                if ((px === sc - 1 || px === sc + 1) && py >= 2 && py <= 8 && ((px + py) % 2 === 0)) isEar = true;
+            }
+            if (!isWheat && !isEar) {
+                setPixel(tx, ty, px, py, 0, 0, 0, 0);
+            } else if (py <= 8) {
+                const shade = ((px + py) % 2 === 0) ? 20 : -15;
+                setPixel(tx, ty, px, py, 232 + shade, 195 + shade, 62 + shade * 0.5, 255);
+            } else {
+                setPixel(tx, ty, px, py, 168, 152, 48, 255);
+            }
+        });
+
+        // 63. STONE_BRICKS
+        fillTile(TILES.STONE_BRICKS, (tx, ty, px, py) => {
+            const n = rnd();
+            const row = Math.floor(py / 8);
+            const isHorizMortar = (py === 0 || py === 8);
+            const isVertMortar = (row === 0 && (px === 0 || px === 8)) || (row === 1 && (px === 4 || px === 12));
+            if (isHorizMortar || isVertMortar) {
+                setPixel(tx, ty, px, py, 82 + n * 12, 84 + n * 12, 86 + n * 12);
+            } else {
+                const highlight = (py === 1 || py === 9) ? 16 : 0;
+                const shade = 122 + n * 24 + highlight;
+                setPixel(tx, ty, px, py, shade, shade, shade + 2);
+            }
+        });
+
+        // 64. LANTERN
+        fillTile(TILES.LANTERN, (tx, ty, px, py) => {
+            const isChain = ((px === 7 || px === 8) && py <= 3 && (py % 2 === 0 || px === 7));
+            const isCap = (px >= 5 && px <= 10 && (py === 4 || py === 5 || py === 13 || py === 14));
+            const isSideBar = ((px === 5 || px === 10) && py >= 6 && py <= 12);
+            const isCore = (px >= 6 && px <= 9 && py >= 6 && py <= 12);
+            if (isChain || isCap || isSideBar) {
+                setPixel(tx, ty, px, py, 46, 52, 62, 255);
+            } else if (isCore) {
+                const centerGlow = (px >= 7 && px <= 8 && py >= 8 && py <= 10);
+                if (centerGlow) setPixel(tx, ty, px, py, 255, 245, 165, 255);
+                else setPixel(tx, ty, px, py, 255, 185, 50, 255);
+            } else {
+                setPixel(tx, ty, px, py, 0, 0, 0, 0);
+            }
+        });
+
+        // 65. DOOR_OAK
+        fillTile(TILES.DOOR_OAK, (tx, ty, px, py) => {
+            const n = rnd();
+            const isWindowHole = ((py >= 2 && py <= 5) && ((px >= 3 && px <= 6) || (px >= 9 && px <= 12)));
+            const isHandle = (px >= 12 && px <= 13 && py >= 8 && py <= 9);
+            const isHinge = (px <= 1 && (py === 3 || py === 12));
+            const isLowerPanel = (py >= 9 && py <= 13 && px >= 3 && px <= 12 && (px !== 7 && px !== 8));
+            if (isWindowHole) {
+                setPixel(tx, ty, px, py, 200, 230, 245, 95);
+            } else if (isHandle) {
+                setPixel(tx, ty, px, py, 225, 195, 75, 255);
+            } else if (isHinge) {
+                setPixel(tx, ty, px, py, 65, 68, 75, 255);
+            } else if (isLowerPanel) {
+                setPixel(tx, ty, px, py, 128 + n * 16, 86 + n * 12, 40, 255);
+            } else {
+                setPixel(tx, ty, px, py, 162 + n * 18, 114 + n * 14, 58 + n * 8, 255);
+            }
+        });
+
+        // 66. BREAD
+        fillTile(TILES.BREAD, (tx, ty, px, py) => {
+            const dx = (px - 7.5) / 6.2;
+            const dy = (py - 8.5) / 3.8;
+            const dist = dx * dx + dy * dy;
+            if (dist > 1.0) {
+                setPixel(tx, ty, px, py, 0, 0, 0, 0);
+            } else if (dist > 0.72 || py >= 10) {
+                setPixel(tx, ty, px, py, 148, 86, 32, 255);
+            } else if ((px === 5 || px === 8 || px === 11) && py >= 6 && py <= 8) {
+                setPixel(tx, ty, px, py, 240, 195, 115, 255);
+            } else {
+                setPixel(tx, ty, px, py, 212, 152, 68, 255);
+            }
+        });
+
+        // 67. GOLDEN_APPLE
+        fillTile(TILES.GOLDEN_APPLE, (tx, ty, px, py) => {
+            const isStem = ((px === 7 || px === 8) && py >= 2 && py <= 4);
+            const isLeaf = ((px === 9 || px === 10) && (py === 2 || py === 3));
+            const dx = (px - 7.5) / 4.8;
+            const dy = (py - 9.2) / 4.8;
+            const dist = dx * dx + dy * dy;
+            if (isLeaf) {
+                setPixel(tx, ty, px, py, 95, 190, 50, 255);
+            } else if (isStem) {
+                setPixel(tx, ty, px, py, 110, 65, 28, 255);
+            } else if (dist <= 1.0 && !(py === 5 && (px === 7 || px === 8))) {
+                const isShine = (px === 5 && (py === 7 || py === 8));
+                if (isShine) setPixel(tx, ty, px, py, 255, 255, 225, 255);
+                else if (dist > 0.76) setPixel(tx, ty, px, py, 195, 138, 12, 255);
+                else setPixel(tx, ty, px, py, 255, 215, 42, 255);
+            } else {
+                setPixel(tx, ty, px, py, 0, 0, 0, 0);
+            }
+        });
+
+        // 68. BOW
+        fillTile(TILES.BOW, (tx, ty, px, py) => {
+            const isWood = ((px === 4 && py >= 5 && py <= 10) ||
+                            (px === 5 && (py === 4 || py === 11)) ||
+                            ((px === 6 || px === 7) && (py === 3 || py === 12)) ||
+                            ((px === 8 || px === 9) && (py === 2 || py === 13)) ||
+                            (px === 10 && (py === 2 || py === 13)));
+            const isString = (px === 10 && py >= 3 && py <= 12);
+            const isGrip = (px === 4 && py >= 7 && py <= 8);
+            if (isGrip) {
+                setPixel(tx, ty, px, py, 210, 175, 125, 255);
+            } else if (isWood) {
+                setPixel(tx, ty, px, py, 128, 76, 30, 255);
+            } else if (isString) {
+                setPixel(tx, ty, px, py, 232, 232, 225, 255);
+            } else {
+                setPixel(tx, ty, px, py, 0, 0, 0, 0);
+            }
+        });
+
         return canvas;
     }
 
@@ -1602,6 +2100,38 @@
                 ctx.fillRect(lTx * 16 + px, lTy * 16 + py, 1, 1);
             }
         }
+
+        // 3. Animate FURNACE_FRONT firebox flames
+        const fTx = TILES.FURNACE_FRONT % 16;
+        const fTy = Math.floor(TILES.FURNACE_FRONT / 16);
+        for (let py = 9; py <= 14; py++) {
+            for (let px = 4; px <= 11; px++) {
+                const flame = Math.sin(px * 0.9 + timeSeconds * 7.5) * 0.5 + Math.cos(py * 1.1 + timeSeconds * 9.0) * 0.5;
+                if (py >= 12 || flame > -0.15) {
+                    const bright = flame > 0.35 || py === 13;
+                    const r = 255;
+                    const g = bright ? 220 : 125;
+                    const b = bright ? 65 : 18;
+                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                } else {
+                    ctx.fillStyle = 'rgb(42,20,12)';
+                }
+                ctx.fillRect(fTx * 16 + px, fTy * 16 + py, 1, 1);
+            }
+        }
+
+        // 4. Animate ENCHANT_TOP pulsing rune sparkles
+        const eTx = TILES.ENCHANT_TOP % 16;
+        const eTy = Math.floor(TILES.ENCHANT_TOP / 16);
+        const pulse = Math.sin(timeSeconds * 3.5) * 0.5 + 0.5;
+        const glowG = Math.round(180 + pulse * 70);
+        const glowB = Math.round(60 + pulse * 175);
+        ctx.fillStyle = `rgb(255,${glowG},${glowB})`;
+        ctx.fillRect(eTx * 16 + 6, eTy * 16 + 6, 1, 1);
+        ctx.fillRect(eTx * 16 + 9, eTy * 16 + 9, 1, 1);
+        ctx.fillRect(eTx * 16 + 6, eTy * 16 + 9, 1, 1);
+        ctx.fillRect(eTx * 16 + 9, eTy * 16 + 6, 1, 1);
+
         return true;
     }
 
@@ -1695,14 +2225,141 @@
             name: 'Glass (x2)',
             output: { id: BLOCKS.GLASS, count: 2 },
             ingredients: [{ id: BLOCKS.SAND, count: 2 }, { id: BLOCKS.COAL_ORE, count: 1 }]
+        },
+        {
+            id: 'furnace',
+            name: 'Furnace (x1)',
+            output: { id: BLOCKS.FURNACE, count: 1 },
+            ingredients: [{ id: BLOCKS.COBBLESTONE, count: 8 }]
+        },
+        {
+            id: 'enchanting_table',
+            name: 'Enchanting Table (x1)',
+            output: { id: BLOCKS.ENCHANTING_TABLE, count: 1 },
+            ingredients: [{ id: BLOCKS.OBSIDIAN, count: 4 }, { id: BLOCKS.DIAMOND_ORE, count: 2 }, { id: BLOCKS.BOOKSHELF, count: 1 }]
+        },
+        {
+            id: 'chest',
+            name: 'Chest (x1)',
+            output: { id: BLOCKS.CHEST, count: 1 },
+            ingredients: [{ id: BLOCKS.PLANKS, count: 8 }]
+        },
+        {
+            id: 'stone_bricks',
+            name: 'Stone Bricks (x4)',
+            output: { id: BLOCKS.STONE_BRICKS, count: 4 },
+            ingredients: [{ id: BLOCKS.STONE, count: 4 }]
+        },
+        {
+            id: 'lantern',
+            name: 'Lantern (x2)',
+            output: { id: BLOCKS.LANTERN, count: 2 },
+            ingredients: [{ id: BLOCKS.TORCH, count: 1 }, { id: BLOCKS.IRON_ORE, count: 2 }]
+        },
+        {
+            id: 'door_oak',
+            name: 'Oak Door (x2)',
+            output: { id: BLOCKS.DOOR_OAK, count: 2 },
+            ingredients: [{ id: BLOCKS.PLANKS, count: 6 }]
+        },
+        {
+            id: 'bread',
+            name: 'Bread (x1)',
+            output: { id: BLOCKS.BREAD, count: 1 },
+            ingredients: [{ id: BLOCKS.WHEAT, count: 3 }]
+        },
+        {
+            id: 'golden_apple',
+            name: 'Golden Apple (x1)',
+            output: { id: BLOCKS.GOLDEN_APPLE, count: 1 },
+            ingredients: [{ id: BLOCKS.GOLD_ORE, count: 3 }, { id: BLOCKS.BREAD, count: 1 }]
+        },
+        {
+            id: 'bow',
+            name: 'Bow (x1)',
+            output: { id: BLOCKS.BOW, count: 1 },
+            ingredients: [{ id: BLOCKS.PLANKS, count: 3 }, { id: BLOCKS.TALL_GRASS, count: 2 }]
+        },
+        {
+            id: 'emerald_block',
+            name: 'Emerald Block (x1)',
+            output: { id: BLOCKS.EMERALD_BLOCK, count: 1 },
+            ingredients: [{ id: BLOCKS.EMERALD_ORE, count: 4 }]
         }
     ];
+
+    const SMELTING_RECIPES = [
+        {
+            id: 'smelt_glass',
+            name: 'Čiré sklo (Glass x4)',
+            output: { id: BLOCKS.GLASS, count: 4 },
+            ingredients: [{ id: BLOCKS.SAND, count: 2 }, { id: BLOCKS.COAL_ORE, count: 1 }],
+            xp: 4
+        },
+        {
+            id: 'smelt_stone',
+            name: 'Hladký kámen (Stone x4)',
+            output: { id: BLOCKS.STONE, count: 4 },
+            ingredients: [{ id: BLOCKS.COBBLESTONE, count: 4 }, { id: BLOCKS.COAL_ORE, count: 1 }],
+            xp: 5
+        },
+        {
+            id: 'smelt_bread',
+            name: 'Upečený chléb (Bread x2)',
+            output: { id: BLOCKS.BREAD, count: 2 },
+            ingredients: [{ id: BLOCKS.WHEAT, count: 3 }, { id: BLOCKS.COAL_ORE, count: 1 }],
+            xp: 4
+        },
+        {
+            id: 'smelt_emerald_block',
+            name: 'Smaragdový blok (x1)',
+            output: { id: BLOCKS.EMERALD_BLOCK, count: 1 },
+            ingredients: [{ id: BLOCKS.EMERALD_ORE, count: 2 }, { id: BLOCKS.COAL_ORE, count: 1 }],
+            xp: 12
+        },
+        {
+            id: 'smelt_golden_apple',
+            name: 'Zlaté jablko (x1)',
+            output: { id: BLOCKS.GOLDEN_APPLE, count: 1 },
+            ingredients: [{ id: BLOCKS.GOLD_ORE, count: 3 }, { id: BLOCKS.WHEAT, count: 2 }, { id: BLOCKS.COAL_ORE, count: 1 }],
+            xp: 15
+        }
+    ];
+
+    const ENCHANTMENTS = {
+        efficiency: {
+            id: 'efficiency',
+            name: 'Účinnost (Efficiency)',
+            target: 'pickaxe',
+            costLevels: 2,
+            maxLevel: 3,
+            desc: 'Rychlejší těžba bloků diamantovým krumpáčem (+35% / úroveň)'
+        },
+        sharpness: {
+            id: 'sharpness',
+            name: 'Ostrost (Sharpness)',
+            target: 'sword',
+            costLevels: 2,
+            maxLevel: 3,
+            desc: 'Vyšší poškození diamantovým mečem (+4 DMG / úroveň)'
+        },
+        flame: {
+            id: 'flame',
+            name: 'Plamen (Flame)',
+            target: 'bow',
+            costLevels: 3,
+            maxLevel: 2,
+            desc: 'Ohnivé a silnější šípy vystřelené z luku (+3 DMG / úroveň)'
+        }
+    };
 
     return {
         BLOCKS,
         TILES,
         BLOCK_DEFS,
         CRAFTING_RECIPES,
+        SMELTING_RECIPES,
+        ENCHANTMENTS,
         getBlockFaceTexture,
         getTileUV,
         createTextureAtlasCanvas,

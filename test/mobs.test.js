@@ -319,4 +319,48 @@ describe('Mobs and AI Entity System tests', () => {
         assert.strictEqual(manager.mobs.includes(pig), false, 'Dead mob must be removed from manager');
         assert.strictEqual(manager.mobs.length, 0);
     });
+
+    test('Villager professions, Iron Golem defense, Skeleton ranged bow, Enderman teleport, and Village population', () => {
+        const world = createMockWorld();
+        world.villages = [{ key: '1,1', cx: 1, cz: 1, x: 23.5, y: 2.0, z: 23.5, populated: false }];
+        const manager = new Mobs.MobManager(world);
+        const mockPlayer = { position: { x: 24.0, y: 1.0, z: 24.0 }, gameMode: 'survival', isFlying: false, takeDamage: () => {} };
+
+        // MobManager populates nearby village with 4 villagers + 1 Iron Golem
+        manager.update(0.05, mockPlayer, 0.5);
+        assert.strictEqual(world.villages[0].populated, true);
+        const villagers = manager.mobs.filter(m => m.type === 'villager');
+        const golems = manager.mobs.filter(m => m.type === 'iron_golem');
+        assert.strictEqual(villagers.length, 4, 'Village should spawn 4 distinct villagers');
+        assert.strictEqual(golems.length, 1, 'Village should spawn 1 Iron Golem');
+        assert.ok(Array.isArray(villagers[0].trades) && villagers[0].trades.length >= 3, 'Villager has trades');
+
+        // Iron Golem damages & launches nearby hostile zombie upward
+        const golem = golems[0];
+        const zombie = manager.spawnMob('zombie', golem.position.x + 1.0, 1.0, golem.position.z);
+        manager.update(0.05, mockPlayer, 0.0);
+        assert.strictEqual(zombie.health, 8, 'Iron Golem deals 12 DMG to nearby zombie');
+        assert.strictEqual(zombie.velocity.y, 10.5, 'Iron Golem launches hostile upward');
+
+        // Skeleton fires ranged arrow callback
+        const skel = manager.spawnMob('skeleton', 15.0, 1.0, 24.0);
+        skel.shootTimer = 0.01;
+        let shotCount = 0;
+        manager.update(0.05, mockPlayer, 0.0, {
+            onSkeletonShoot: () => { shotCount++; }
+        });
+        assert.strictEqual(shotCount, 1, 'Skeleton triggers onSkeletonShoot when timer elapses');
+
+        // Enderman teleports on hurt
+        const em = manager.spawnMob('enderman', 20.0, 1.0, 20.0);
+        em.hurtTimer = 0.3;
+        let teleported = false;
+        const startX = em.position.x;
+        const startZ = em.position.z;
+        manager.update(0.05, mockPlayer, 0.0, {
+            onEndermanTeleport: () => { teleported = true; }
+        });
+        assert.strictEqual(teleported, true, 'Enderman triggers teleport when hit');
+        assert.ok(Math.hypot(em.position.x - startX, em.position.z - startZ) > 1.0, 'Enderman changes position upon teleport');
+    });
 });

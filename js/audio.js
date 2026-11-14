@@ -647,6 +647,185 @@
                 this.musicTimer = 3.2 + (this.musicStep % 3) * 1.1;
             }
         }
+
+        /**
+         * Friendly villager "Hrmmm" vowel formant glide
+         */
+        playVillagerSound() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const filter = this.ctx.createBiquadFilter();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(165, t);
+            osc.frequency.linearRampToValueAtTime(148, t + 0.14);
+            osc.frequency.linearRampToValueAtTime(175, t + 0.28);
+
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(620, t);
+            filter.Q.setValueAtTime(4.0, t);
+
+            gain.gain.setValueAtTime(0.001, t);
+            gain.gain.linearRampToValueAtTime(0.14, t + 0.04);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.30);
+
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.32);
+        }
+
+        /**
+         * Bowstring twang & arrow whoosh
+         */
+        playBowShoot() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+            const t = this.ctx.currentTime;
+
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(240, t);
+            osc.frequency.exponentialRampToValueAtTime(90, t + 0.14);
+            gain.gain.setValueAtTime(0.20, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.15);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.16);
+
+            const nBuf = this.createNoiseBuffer(0.12);
+            if (nBuf) {
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = nBuf;
+                const filt = this.ctx.createBiquadFilter();
+                filt.type = 'bandpass';
+                filt.frequency.setValueAtTime(1800, t);
+                const nGain = this.ctx.createGain();
+                nGain.gain.setValueAtTime(0.12, t);
+                nGain.gain.exponentialRampToValueAtTime(0.001, t + 0.11);
+                noise.connect(filt);
+                filt.connect(nGain);
+                nGain.connect(this.ctx.destination);
+                noise.start(t);
+            }
+        }
+
+        /**
+         * Bright XP orb pickup chime
+         */
+        playXpPickup() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const base = 680 + Math.random() * 280;
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(base, t);
+            osc.frequency.exponentialRampToValueAtTime(base * 1.45, t + 0.09);
+            gain.gain.setValueAtTime(0.11, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.13);
+        }
+
+        /**
+         * Ascending chime fanfare on XP level-up or Enchanting
+         */
+        playLevelUp() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+            const t = this.ctx.currentTime;
+            const notes = [523.25, 659.25, 783.99, 1046.5];
+            notes.forEach((freq, i) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                const st = t + i * 0.07;
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(freq, st);
+                gain.gain.setValueAtTime(0.13, st);
+                gain.gain.exponentialRampToValueAtTime(0.001, st + 0.25);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(st);
+                osc.stop(st + 0.27);
+            });
+        }
+
+        /**
+         * Food crunch sound
+         */
+        playEat() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+            const t = this.ctx.currentTime;
+            for (let i = 0; i < 3; i++) {
+                const nBuf = this.createNoiseBuffer(0.07);
+                if (!nBuf) continue;
+                const src = this.ctx.createBufferSource();
+                src.buffer = nBuf;
+                const filt = this.ctx.createBiquadFilter();
+                filt.type = 'bandpass';
+                filt.frequency.setValueAtTime(950 + i * 240, t + i * 0.08);
+                const gain = this.ctx.createGain();
+                const st = t + i * 0.08;
+                gain.gain.setValueAtTime(0.18, st);
+                gain.gain.exponentialRampToValueAtTime(0.001, st + 0.065);
+                src.connect(filt);
+                filt.connect(gain);
+                gain.connect(this.ctx.destination);
+                src.start(st);
+            }
+        }
+
+        /**
+         * Wooden door creak/latch sound
+         */
+        playDoor() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(160, t);
+            osc.frequency.exponentialRampToValueAtTime(92, t + 0.12);
+            gain.gain.setValueAtTime(0.20, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.13);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.14);
+        }
+
+        /**
+         * Enderman spatial warp sound
+         */
+        playEndermanTeleport() {
+            if (!this.ctx || !this.enabled) return;
+            this.resume();
+            const t = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.setValueAtTime(480, t);
+            osc.frequency.exponentialRampToValueAtTime(120, t + 0.12);
+            osc.frequency.exponentialRampToValueAtTime(640, t + 0.24);
+            gain.gain.setValueAtTime(0.14, t);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(t);
+            osc.stop(t + 0.27);
+        }
     }
 
     return SoundFX;

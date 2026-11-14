@@ -56,6 +56,14 @@
     let textureAnimTimer = 0;
     let totalElapsedTime = 0;
     let lavaSparkTimer = 0;
+    let auroraMesh = null;
+    let fireflies = [];
+    let fireflyTimer = 0;
+
+    // Advanced Gameplay Entities (XP Orbs, 3D Arrows, Loot Chests)
+    let xpOrbs = [];
+    let arrows = [];
+    let openedChests = new Set();
 
     // Dynamic Water Flow
     let waterFlowQueue = [];
@@ -176,9 +184,10 @@
         // 8b. Setup 3D First-Person Held Block in Hand
         setupHeldBlock();
 
-        // 8c. Setup 3D Sky Clouds & Weather
+        // 8c. Setup 3D Sky Clouds, Weather & Night Aurora
         setupClouds();
         setupWeather();
+        setupAuroraAndFireflies();
 
         // 8d. Setup 3D Third-Person Steve Player Model
         setupPlayerModel();
@@ -211,6 +220,12 @@
             hotbarBlocks: window.UI ? window.UI.hotbarBlocks : undefined,
             inventoryCounts: window.UI ? window.UI.inventoryCounts : undefined,
             health: player.health !== undefined ? player.health : 20,
+            hunger: player.hunger !== undefined ? player.hunger : 20,
+            absorption: player.absorption || 0,
+            xp: player.xp || 0,
+            xpLevel: player.xpLevel || 0,
+            enchantments: player.enchantments || { efficiency: 0, sharpness: 0, flame: 0 },
+            openedChests: Array.from(openedChests),
             oxygen: player.oxygen !== undefined ? player.oxygen : 15.0,
             gameMode: player.gameMode || 'survival',
             dayTime: dayTime,
@@ -248,9 +263,30 @@
                 window.UI.inventoryCounts = Object.assign({}, data.inventoryCounts);
                 if (window.UI.buildHotbar) window.UI.buildHotbar();
             }
+            if (typeof data.absorption === 'number' && !isNaN(data.absorption)) {
+                player.absorption = Math.max(0, data.absorption);
+            }
             if (typeof data.health === 'number' && !isNaN(data.health)) {
                 player.health = Math.max(1, Math.min(20, data.health));
-                if (window.UI) window.UI.updateHealth(player.health);
+                if (window.UI) window.UI.updateHealth(player.health, player.absorption || 0);
+            }
+            if (typeof data.hunger === 'number' && !isNaN(data.hunger)) {
+                player.hunger = Math.max(0, Math.min(20, data.hunger));
+                if (window.UI && typeof window.UI.updateHunger === 'function') {
+                    window.UI.updateHunger(player.hunger, player.maxHunger || 20);
+                }
+            }
+            if (typeof data.xp === 'number' && !isNaN(data.xp)) player.xp = Math.max(0, data.xp);
+            if (typeof data.xpLevel === 'number' && !isNaN(data.xpLevel)) player.xpLevel = Math.max(0, data.xpLevel);
+            if (data.enchantments && typeof data.enchantments === 'object') {
+                player.enchantments = Object.assign({ efficiency: 0, sharpness: 0, flame: 0 }, data.enchantments);
+            }
+            openedChests.clear();
+            if (Array.isArray(data.openedChests)) {
+                data.openedChests.forEach(k => openedChests.add(k));
+            }
+            if (window.UI && typeof window.UI.updateXP === 'function' && typeof player.getXPRequired === 'function') {
+                window.UI.updateXP(player.xp, player.getXPRequired(player.xpLevel), player.xpLevel);
             }
             if (typeof data.oxygen === 'number' && !isNaN(data.oxygen)) {
                 player.oxygen = Math.max(0, Math.min(player.maxOxygen || 15.0, data.oxygen));
@@ -303,10 +339,15 @@
         handPointLight = new THREE.PointLight(0xffaa44, 0, 14, 1.5);
         scene.add(handPointLight);
 
-        // Sun Billboard
+        // Sun Billboard + Soft Golden Corona Halo
         const sunGeo = new THREE.PlaneGeometry(16, 16);
         const sunMat = new THREE.MeshBasicMaterial({ color: 0xffffee, side: THREE.DoubleSide });
         sunMesh = new THREE.Mesh(sunGeo, sunMat);
+        const coronaGeo = new THREE.PlaneGeometry(34, 34);
+        const coronaMat = new THREE.MeshBasicMaterial({ color: 0xffd277, transparent: true, opacity: 0.24, side: THREE.DoubleSide, depthWrite: false });
+        const sunCorona = new THREE.Mesh(coronaGeo, coronaMat);
+        sunCorona.position.z = -0.1;
+        sunMesh.add(sunCorona);
         scene.add(sunMesh);
 
         // Moon Billboard
@@ -845,13 +886,14 @@
                 isPaused = false;
                 if (blocker) blocker.style.display = 'none';
                 if (window.UI && window.UI.isInventoryOpen) window.UI.closeInventory();
+                if (window.UI && window.UI.isTradingOpen) window.UI.closeTradingModal();
             } else {
                 isMouseDown = false;
                 activeMouseButton = -1;
                 miningProgress = 0;
                 miningTargetKey = null;
                 if (crackMesh) crackMesh.visible = false;
-                if (window.UI && window.UI.isInventoryOpen) {
+                if (window.UI && (window.UI.isInventoryOpen || window.UI.isTradingOpen)) {
                     isPaused = true;
                     if (blocker) blocker.style.display = 'none';
                 } else {
@@ -888,7 +930,7 @@
             renderer.domElement.addEventListener('click', () => {
                 if (isPaused) {
                     resumeGame();
-                } else if (!player.isLocked && !isTouchDevice && (!window.UI || !window.UI.isInventoryOpen)) {
+                } else if (!player.isLocked && !isTouchDevice && (!window.UI || (!window.UI.isInventoryOpen && !window.UI.isTradingOpen))) {
                     lockPointer();
                 }
             });
@@ -896,12 +938,14 @@
 
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Escape') {
-                if (window.UI && window.UI.isInventoryOpen) {
+                if (window.UI && window.UI.isTradingOpen) {
+                    window.UI.closeTradingModal();
+                } else if (window.UI && window.UI.isInventoryOpen) {
                     window.UI.closeInventory();
                 } else if (!isPaused) {
                     pauseGame();
                 }
-            } else if (!isPaused && (!window.UI || !window.UI.isInventoryOpen)) {
+            } else if (!isPaused && (!window.UI || (!window.UI.isInventoryOpen && !window.UI.isTradingOpen))) {
                 if (e.code === 'KeyR') {
                     cycleWeather();
                 } else if (e.code === 'KeyT') {
@@ -921,6 +965,7 @@
             waterFlowCount = 0;
             miningProgress = 0;
             miningTargetKey = null;
+            openedChests.clear();
             if (crackMesh) crackMesh.visible = false;
             for (const tnt of activeTNTs) {
                 scene.remove(tnt.mesh);
@@ -942,6 +987,25 @@
                 if (item.mesh.material) item.mesh.material.dispose();
             }
             droppedItems = [];
+
+            for (const orb of xpOrbs) {
+                scene.remove(orb.mesh);
+                if (orb.mesh.geometry) orb.mesh.geometry.dispose();
+                if (orb.mesh.material) orb.mesh.material.dispose();
+            }
+            xpOrbs = [];
+
+            for (const ar of arrows) {
+                scene.remove(ar.mesh);
+            }
+            arrows = [];
+
+            for (const ff of fireflies) {
+                scene.remove(ff.mesh);
+                if (ff.mesh.geometry) ff.mesh.geometry.dispose();
+                if (ff.mesh.material) ff.mesh.material.dispose();
+            }
+            fireflies = [];
 
             if (mobManager && typeof mobManager.clear === 'function') {
                 mobManager.clear();
@@ -1079,7 +1143,10 @@
                 if (mobManager) {
                     const mobHit = mobManager.raycastMob(eyePos, lookDir, 4.0);
                     if (mobHit && mobHit.hit && (!player.targetBlock || !player.targetBlock.hit || mobHit.distance <= player.targetBlock.distance)) {
-                        const baseDmg = (heldDef && typeof heldDef.attackDamage === 'number') ? heldDef.attackDamage : 5;
+                        const heldId = window.UI ? window.UI.getSelectedBlockId() : 1;
+                        const baseDmg = typeof player.getAttackDamage === 'function'
+                            ? player.getAttackDamage(heldId)
+                            : ((heldDef && typeof heldDef.attackDamage === 'number') ? heldDef.attackDamage : 5);
                         const dmg = (player.isFlying || player.gameMode === 'creative') ? 25 : baseDmg;
                         mobManager.hitMob(mobHit.mob, dmg, player.position, {
                             onMobKilled: (m) => {
@@ -1087,6 +1154,8 @@
                                 if (m.def && m.def.dropBlockId) {
                                     spawnItemDrop(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z), m.def.dropBlockId);
                                 }
+                                const xpReward = m.type === 'enderman' ? 12 : (m.hostile ? 6 : 3);
+                                spawnXPOrbs(m.position.x, m.position.y + 0.5, m.position.z, xpReward);
                             }
                         });
                         mouseActionCooldown = BREAK_COOLDOWN;
@@ -1490,6 +1559,25 @@
             spawnDebris(pos.x, pos.y, pos.z, blockId);
             spawnItemDrop(pos.x, pos.y, pos.z, blockId);
 
+            // Clean up open door tracking if breaking a door
+            const B = window.Blocks && window.Blocks.BLOCKS ? window.Blocks.BLOCKS : {};
+            if (B.DOOR_OAK !== undefined && blockId === B.DOOR_OAK && world.openDoors) {
+                world.openDoors.delete(world.getBlockKey(pos.x, pos.y, pos.z));
+            }
+
+            // Reward mining ores with glowing XP Orbs in Survival
+            if (player.gameMode === 'survival') {
+                let oreXP = 0;
+                if (blockId === B.COAL_ORE) oreXP = 2;
+                else if (blockId === B.IRON_ORE) oreXP = 3;
+                else if (blockId === B.GOLD_ORE) oreXP = 5;
+                else if (blockId === B.DIAMOND_ORE) oreXP = 8;
+                else if (blockId === B.EMERALD_ORE) oreXP = 10;
+                if (oreXP > 0) {
+                    spawnXPOrbs(pos.x + 0.5, pos.y + 0.5, pos.z + 0.5, oreXP);
+                }
+            }
+
             world.setBlock(pos.x, pos.y, pos.z, window.Blocks.BLOCKS.AIR);
             updateAffectedChunks(pos.x, pos.z);
             waterFlowCount = 0;
@@ -1501,67 +1589,167 @@
     }
 
     function onPlaceOrInteract() {
-        if (!player.targetBlock || !player.targetBlock.hit) return;
+        const B = (window.Blocks && window.Blocks.BLOCKS) ? window.Blocks.BLOCKS : {};
 
-        const hitPos = player.targetBlock.blockPos;
-        const hitBlockId = world.getBlock(hitPos.x, hitPos.y, hitPos.z);
-
-        // Right-clicking Crafting Table opens crafting inventory!
-        const craftingTableId = (window.Blocks && window.Blocks.BLOCKS && window.Blocks.BLOCKS.CRAFTING_TABLE !== undefined)
-            ? window.Blocks.BLOCKS.CRAFTING_TABLE
-            : 26;
-        if (hitBlockId === craftingTableId && !player.isSneaking) {
-            if (window.UI && typeof window.UI.openInventory === 'function') {
-                window.UI.openInventory();
-            }
-            isMouseDown = false;
-            activeMouseButton = -1;
-            return;
-        }
-
-        // Right-clicking Bed sets spawnpoint, heals player, and skips night/storm!
-        const bedId = (window.Blocks && window.Blocks.BLOCKS && window.Blocks.BLOCKS.BED !== undefined)
-            ? window.Blocks.BLOCKS.BED
-            : 32;
-        if (hitBlockId === bedId && !player.isSneaking) {
-            player.spawnPoint = {
-                x: hitPos.x + 0.5,
-                y: hitPos.y + 1.1,
-                z: hitPos.z + 0.5
+        // 1. Check right-clicking a Villager to trade
+        if (mobManager) {
+            const eyePos = player.eyePosition || {
+                x: player.position.x,
+                y: player.position.y + (player.currentEyeHeight || 1.62),
+                z: player.position.z
             };
-            player.health = 20;
-            if (window.UI && typeof window.UI.updateHealth === 'function') {
-                window.UI.updateHealth(20);
-            }
-            if (audio && typeof audio.playSleep === 'function') {
-                audio.playSleep();
-            }
-            if (window.UI && typeof window.UI.triggerSleepFade === 'function') {
-                window.UI.triggerSleepFade();
-            }
-            dayTime = 0.25; // Morning
-            if (weatherState !== 'clear') {
-                weatherState = 'clear';
-                if (window.UI && typeof window.UI.updateWeatherUI === 'function') {
-                    window.UI.updateWeatherUI(weatherState);
+            const lookDir = typeof player.getLookDirection === 'function' ? player.getLookDirection() : { x: 0, y: 0, z: -1 };
+            const mobHit = mobManager.raycastMob(eyePos, lookDir, 4.5);
+            if (mobHit && mobHit.hit && mobHit.mob && mobHit.mob.type === 'villager') {
+                const blockDist = (player.targetBlock && player.targetBlock.hit) ? player.targetBlock.distance : Infinity;
+                if (mobHit.distance <= blockDist + 0.2) {
+                    if (audio && typeof audio.playVillagerSound === 'function') {
+                        audio.playVillagerSound();
+                    }
+                    if (window.UI && typeof window.UI.openTradingModal === 'function') {
+                        window.UI.openTradingModal(mobHit.mob);
+                    }
+                    isMouseDown = false;
+                    activeMouseButton = -1;
+                    return;
                 }
             }
-            if (window.UI) {
-                window.UI.showToast('Uloženo lůžko (Spawnpoint)! Dobré ráno! 🛏️');
+        }
+
+        // 2. Interactive targeted blocks (when not sneaking)
+        if (player.targetBlock && player.targetBlock.hit && !player.isSneaking) {
+            const hitPos = player.targetBlock.blockPos;
+            const hitBlockId = world.getBlock(hitPos.x, hitPos.y, hitPos.z);
+
+            if (B.DOOR_OAK !== undefined && hitBlockId === B.DOOR_OAK) {
+                if (typeof world.toggleDoor === 'function' && world.toggleDoor(hitPos.x, hitPos.y, hitPos.z)) {
+                    updateAffectedChunks(hitPos.x, hitPos.z);
+                    if (audio && typeof audio.playDoor === 'function') audio.playDoor();
+                }
+                isMouseDown = false;
+                activeMouseButton = -1;
+                return;
+            }
+
+            if (B.FURNACE !== undefined && hitBlockId === B.FURNACE) {
+                if (window.UI && typeof window.UI.openInventory === 'function') {
+                    window.UI.openInventory('smelting');
+                }
+                isMouseDown = false;
+                activeMouseButton = -1;
+                return;
+            }
+
+            if (B.ENCHANTING_TABLE !== undefined && hitBlockId === B.ENCHANTING_TABLE) {
+                if (window.UI && typeof window.UI.openInventory === 'function') {
+                    window.UI.openInventory('enchanting');
+                }
+                isMouseDown = false;
+                activeMouseButton = -1;
+                return;
+            }
+
+            if (B.CHEST !== undefined && hitBlockId === B.CHEST) {
+                const chestKey = `${hitPos.x},${hitPos.y},${hitPos.z}`;
+                if (!openedChests.has(chestKey)) {
+                    openedChests.add(chestKey);
+                    if (window.UI && typeof window.UI.addCollectedItem === 'function') {
+                        window.UI.addCollectedItem(B.EMERALD_ORE || 39, 3);
+                        window.UI.addCollectedItem(B.BREAD || 49, 2);
+                        window.UI.addCollectedItem(B.GOLDEN_APPLE || 50, 1);
+                        window.UI.addCollectedItem(B.DIAMOND_ORE || 30, 1);
+                    }
+                    spawnXPOrbs(hitPos.x + 0.5, hitPos.y + 1.1, hitPos.z + 0.5, 8);
+                    if (audio && typeof audio.playPickup === 'function') audio.playPickup();
+                    if (window.UI) window.UI.showToast('Truhla s pokladem! +3 Smaragdy, Chléb, Zlaté jablko & Diamant!');
+                } else {
+                    if (window.UI) window.UI.showToast('Tato truhla již byla vybrána.');
+                }
+                isMouseDown = false;
+                activeMouseButton = -1;
+                return;
+            }
+
+            const craftingTableId = (B.CRAFTING_TABLE !== undefined) ? B.CRAFTING_TABLE : 26;
+            if (hitBlockId === craftingTableId) {
+                if (window.UI && typeof window.UI.openInventory === 'function') {
+                    window.UI.openInventory('crafting');
+                }
+                isMouseDown = false;
+                activeMouseButton = -1;
+                return;
+            }
+
+            const bedId = (B.BED !== undefined) ? B.BED : 32;
+            if (hitBlockId === bedId) {
+                player.spawnPoint = {
+                    x: hitPos.x + 0.5,
+                    y: hitPos.y + 1.1,
+                    z: hitPos.z + 0.5
+                };
+                player.health = 20;
+                if (window.UI && typeof window.UI.updateHealth === 'function') {
+                    window.UI.updateHealth(20, player.absorption || 0);
+                }
+                if (audio && typeof audio.playSleep === 'function') {
+                    audio.playSleep();
+                }
+                if (window.UI && typeof window.UI.triggerSleepFade === 'function') {
+                    window.UI.triggerSleepFade();
+                }
+                dayTime = 0.25; // Morning
+                if (weatherState !== 'clear') {
+                    weatherState = 'clear';
+                    if (window.UI && typeof window.UI.updateWeatherUI === 'function') {
+                        window.UI.updateWeatherUI(weatherState);
+                    }
+                }
+                if (window.UI) {
+                    window.UI.showToast('Uloženo lůžko (Spawnpoint)! Dobré ráno! 🛏️');
+                }
+                isMouseDown = false;
+                activeMouseButton = -1;
+                return;
+            }
+
+            if (hitBlockId === B.TNT) {
+                igniteTNT(hitPos.x, hitPos.y, hitPos.z);
+                isMouseDown = false;
+                activeMouseButton = -1;
+                return;
+            }
+        }
+
+        // 3. Held usable items (Food & Bow work anywhere!)
+        const heldId = window.UI ? window.UI.getSelectedBlockId() : 1;
+        const heldDef = window.Blocks && window.Blocks.BLOCK_DEFS ? window.Blocks.BLOCK_DEFS[heldId] : null;
+        if (heldDef && heldDef.isFood) {
+            if (typeof player.eatFood === 'function' && player.eatFood(heldId)) {
+                triggerHandSwing();
+                if (window.UI) window.UI.showToast(`Snědeno: ${heldDef.name}!`);
+            } else if (window.UI) {
+                window.UI.showToast('Jsi plný (plný hlad i zdraví)!');
             }
             isMouseDown = false;
             activeMouseButton = -1;
             return;
         }
-
-        // Right-clicking TNT ignites it!
-        if (hitBlockId === window.Blocks.BLOCKS.TNT) {
-            igniteTNT(hitPos.x, hitPos.y, hitPos.z);
-            isMouseDown = false;
-            activeMouseButton = -1;
+        if (heldDef && heldDef.isBow) {
+            const eyePos = player.eyePosition || {
+                x: player.position.x,
+                y: player.position.y + (player.currentEyeHeight || 1.62),
+                z: player.position.z
+            };
+            const lookDir = typeof player.getLookDirection === 'function' ? player.getLookDirection() : { x: 0, y: 0, z: -1 };
+            const flameLevel = (player.enchantments && player.enchantments.flame) ? player.enchantments.flame : 0;
+            const bowDmg = 9 + flameLevel * 3;
+            shootArrow(eyePos, lookDir, true, bowDmg, flameLevel > 0);
+            triggerHandSwing();
+            if (audio && typeof audio.playBowShoot === 'function') audio.playBowShoot();
             return;
         }
 
+        if (!player.targetBlock || !player.targetBlock.hit) return;
         onPlaceBlock();
     }
 
@@ -1571,10 +1759,10 @@
         const selectedBlockId = window.UI.getSelectedBlockId();
         const bDef = window.Blocks.BLOCK_DEFS[selectedBlockId];
 
-        // Tools (Pickaxe, Sword) cannot be placed as blocks in the world
-        if (bDef && bDef.isTool) {
+        // Tools and Food cannot be placed as blocks in the world
+        if (bDef && (bDef.isTool || bDef.isFood)) {
             triggerHandSwing();
-            if (audio && typeof audio.playSwordSwing === 'function') {
+            if (bDef.isTool && audio && typeof audio.playSwordSwing === 'function') {
                 audio.playSwordSwing();
             }
             return;
@@ -1600,6 +1788,273 @@
 
         player.updateRaycast();
         updateBlockOutline();
+    }
+
+    function spawnXPOrbs(x, y, z, totalXP = 4) {
+        if (!scene || totalXP <= 0) return;
+        const orbCount = Math.min(6, Math.max(1, Math.ceil(totalXP / 2)));
+        const perOrb = Math.max(1, Math.ceil(totalXP / orbCount));
+        for (let i = 0; i < orbCount; i++) {
+            const geo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+            const mat = new THREE.MeshBasicMaterial({ color: i % 2 === 0 ? 0x8cff3b : 0xfff055 });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            xpOrbs.push({
+                mesh,
+                xp: perOrb,
+                vel: {
+                    x: (Math.random() - 0.5) * 3.2,
+                    y: 3.0 + Math.random() * 2.2,
+                    z: (Math.random() - 0.5) * 3.2
+                },
+                age: 0
+            });
+        }
+    }
+
+    function updateXPOrbs(dt) {
+        for (let i = xpOrbs.length - 1; i >= 0; i--) {
+            const orb = xpOrbs[i];
+            orb.age += dt;
+            if (orb.age > 45.0) {
+                scene.remove(orb.mesh);
+                orb.mesh.geometry.dispose();
+                orb.mesh.material.dispose();
+                xpOrbs.splice(i, 1);
+                continue;
+            }
+
+            const pPos = player.position;
+            const dx = pPos.x - orb.mesh.position.x;
+            const dy = (pPos.y + 0.9) - orb.mesh.position.y;
+            const dz = pPos.z - orb.mesh.position.z;
+            const dist = Math.hypot(dx, dy, dz);
+
+            if (dist < 1.35) {
+                if (typeof player.addXP === 'function') player.addXP(orb.xp);
+                if (audio && typeof audio.playXpPickup === 'function') audio.playXpPickup();
+                scene.remove(orb.mesh);
+                orb.mesh.geometry.dispose();
+                orb.mesh.material.dispose();
+                xpOrbs.splice(i, 1);
+                continue;
+            }
+
+            if (dist < 5.5) {
+                const pull = 12.0 * dt;
+                orb.vel.x += (dx / dist) * pull * 4.5;
+                orb.vel.y += (dy / dist) * pull * 4.5;
+                orb.vel.z += (dz / dist) * pull * 4.5;
+            } else {
+                orb.vel.y -= 16.0 * dt;
+            }
+
+            orb.mesh.position.x += orb.vel.x * dt;
+            orb.mesh.position.y += orb.vel.y * dt;
+            orb.mesh.position.z += orb.vel.z * dt;
+            orb.mesh.rotation.y += 4.0 * dt;
+
+            if (dist >= 5.5 && world && world.isSolid(orb.mesh.position.x, orb.mesh.position.y - 0.12, orb.mesh.position.z)) {
+                orb.mesh.position.y = Math.floor(orb.mesh.position.y - 0.12) + 1.12;
+                orb.vel.y = 0;
+                orb.vel.x *= 0.6;
+                orb.vel.z *= 0.6;
+            }
+        }
+    }
+
+    function shootArrow(origin, dir, isFromPlayer = true, damage = 9, isFlaming = false) {
+        if (!scene) return;
+        const len = Math.hypot(dir.x, dir.y, dir.z) || 1;
+        const nx = dir.x / len;
+        const ny = dir.y / len;
+        const nz = dir.z / len;
+
+        const group = new THREE.Group();
+        const shaft = new THREE.Mesh(
+            new THREE.BoxGeometry(0.05, 0.05, 0.62),
+            new THREE.MeshBasicMaterial({ color: isFlaming ? 0xff7722 : 0x8b5a2b })
+        );
+        const tip = new THREE.Mesh(
+            new THREE.BoxGeometry(0.09, 0.09, 0.12),
+            new THREE.MeshBasicMaterial({ color: isFlaming ? 0xffdd44 : 0xcccccc })
+        );
+        tip.position.z = -0.34;
+        group.add(shaft);
+        group.add(tip);
+
+        const spawnX = origin.x + nx * 0.65;
+        const spawnY = origin.y + ny * 0.65;
+        const spawnZ = origin.z + nz * 0.65;
+        group.position.set(spawnX, spawnY, spawnZ);
+        group.lookAt(spawnX + nx * 5, spawnY + ny * 5, spawnZ + nz * 5);
+        scene.add(group);
+
+        const speed = isFromPlayer ? 28.0 : 19.0;
+        arrows.push({
+            mesh: group,
+            vel: { x: nx * speed, y: ny * speed + (isFromPlayer ? 1.5 : 1.0), z: nz * speed },
+            isFromPlayer,
+            damage,
+            isFlaming,
+            age: 0
+        });
+    }
+
+    function updateArrows(dt) {
+        for (let i = arrows.length - 1; i >= 0; i--) {
+            const ar = arrows[i];
+            ar.age += dt;
+            ar.vel.y -= 16.0 * dt;
+
+            ar.mesh.position.x += ar.vel.x * dt;
+            ar.mesh.position.y += ar.vel.y * dt;
+            ar.mesh.position.z += ar.vel.z * dt;
+            ar.mesh.lookAt(
+                ar.mesh.position.x + ar.vel.x,
+                ar.mesh.position.y + ar.vel.y,
+                ar.mesh.position.z + ar.vel.z
+            );
+
+            if (ar.isFlaming && Math.random() < 0.6) {
+                const pMesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.08, 0.08, 0.08),
+                    new THREE.MeshBasicMaterial({ color: 0xff8822 })
+                );
+                pMesh.position.copy(ar.mesh.position);
+                scene.add(pMesh);
+                particles.push({ mesh: pMesh, vel: { x: 0, y: 0.8, z: 0 }, life: 0.25 });
+            }
+
+            let removeArrow = ar.age > 5.0;
+            const ax = ar.mesh.position.x, ay = ar.mesh.position.y, az = ar.mesh.position.z;
+
+            if (!removeArrow && world && world.isSolid(ax, ay, az)) {
+                removeArrow = true;
+            }
+
+            if (!removeArrow && ar.isFromPlayer && mobManager) {
+                for (let mi = 0; mi < mobManager.mobs.length; mi++) {
+                    const m = mobManager.mobs[mi];
+                    if (!m || m.dead) continue;
+                    const distXZ = Math.hypot(ax - m.position.x, az - m.position.z);
+                    if (distXZ <= (m.width * 0.7 + 0.35) && ay >= m.position.y && ay <= m.position.y + m.height + 0.2) {
+                        mobManager.hitMob(m, ar.damage, ar.mesh.position, {
+                            onMobKilled: (killed) => {
+                                spawnExplosionParticles(killed.position.x, killed.position.y + 0.5, killed.position.z);
+                                if (killed.def && killed.def.dropBlockId) {
+                                    spawnItemDrop(Math.floor(killed.position.x), Math.floor(killed.position.y), Math.floor(killed.position.z), killed.def.dropBlockId);
+                                }
+                                const xpReward = killed.type === 'enderman' ? 12 : (killed.hostile ? 6 : 3);
+                                spawnXPOrbs(killed.position.x, killed.position.y + 0.5, killed.position.z, xpReward);
+                            }
+                        });
+                        removeArrow = true;
+                        break;
+                    }
+                }
+            } else if (!removeArrow && !ar.isFromPlayer && player && player.gameMode === 'survival') {
+                const distXZ = Math.hypot(ax - player.position.x, az - player.position.z);
+                if (distXZ <= 0.55 && ay >= player.position.y && ay <= player.position.y + player.height) {
+                    if (typeof player.takeDamage === 'function') player.takeDamage(ar.damage);
+                    removeArrow = true;
+                }
+            }
+
+            if (removeArrow) {
+                scene.remove(ar.mesh);
+                ar.mesh.traverse(c => {
+                    if (c.geometry) c.geometry.dispose();
+                    if (c.material) c.material.dispose();
+                });
+                arrows.splice(i, 1);
+            }
+        }
+    }
+
+    function setupAuroraAndFireflies() {
+        if (!scene) return;
+        const geo = new THREE.PlaneGeometry(240, 38, 24, 2);
+        const posAttr = geo.attributes.position;
+        const cols = [];
+        for (let i = 0; i < posAttr.count; i++) {
+            const x = posAttr.getX(i);
+            const y = posAttr.getY(i);
+            // Gentle undulating curtain wave
+            posAttr.setZ(i, Math.sin(x * 0.035) * 16.0 + Math.cos(x * 0.08) * 6.0);
+            const normX = (x + 120) / 240;
+            const r = 0.20 + Math.sin(normX * Math.PI) * 0.25;
+            const g = 0.95 - normX * 0.35;
+            const b = 0.65 + normX * 0.35;
+            const fadeY = y > 0 ? 0.35 : 1.0;
+            cols.push(r * fadeY, g * fadeY, b * fadeY);
+        }
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+        geo.computeVertexNormals();
+        const mat = new THREE.MeshBasicMaterial({
+            vertexColors: true,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        auroraMesh = new THREE.Mesh(geo, mat);
+        auroraMesh.rotation.x = 0.18;
+        scene.add(auroraMesh);
+    }
+
+    function updateAuroraAndFireflies(dt) {
+        const angle = dayTime * Math.PI * 2 - (Math.PI / 2);
+        const sunHeight = Math.sin(angle);
+        const isNightFade = Math.max(0, Math.min(1, (-sunHeight - 0.05) * 2.5));
+
+        if (auroraMesh && player) {
+            auroraMesh.position.set(player.position.x, 125, player.position.z - 120);
+            auroraMesh.material.opacity = isNightFade * (weatherState === 'clear' ? 0.38 : 0.12);
+            auroraMesh.rotation.z = Math.sin(totalElapsedTime * 0.18) * 0.04;
+        }
+
+        // Spawn & animate night fireflies near grass/trees
+        if (isNightFade > 0.3 && player && fireflies.length < 22) {
+            fireflyTimer += dt;
+            if (fireflyTimer >= 0.25) {
+                fireflyTimer = 0;
+                const ang = Math.random() * Math.PI * 2;
+                const rad = 4 + Math.random() * 14;
+                const fx = player.position.x + Math.cos(ang) * rad;
+                const fz = player.position.z + Math.sin(ang) * rad;
+                const fy = player.position.y + 0.5 + Math.random() * 2.5;
+                const mesh = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.08, 0.08, 0.08),
+                    new THREE.MeshBasicMaterial({ color: 0xccff55, transparent: true, opacity: 0.85 })
+                );
+                mesh.position.set(fx, fy, fz);
+                scene.add(mesh);
+                fireflies.push({
+                    mesh,
+                    phase: Math.random() * Math.PI * 2,
+                    life: 5.0 + Math.random() * 4.0
+                });
+            }
+        }
+
+        for (let i = fireflies.length - 1; i >= 0; i--) {
+            const ff = fireflies[i];
+            ff.life -= dt;
+            ff.phase += dt * 3.2;
+            ff.mesh.position.x += Math.sin(ff.phase) * 0.45 * dt;
+            ff.mesh.position.y += Math.cos(ff.phase * 1.4) * 0.28 * dt;
+            ff.mesh.position.z += Math.cos(ff.phase * 0.8) * 0.45 * dt;
+            ff.mesh.material.opacity = isNightFade > 0.1 ? (0.4 + 0.55 * Math.sin(ff.phase * 2.0)) : 0;
+
+            if (ff.life <= 0 || isNightFade <= 0.05) {
+                scene.remove(ff.mesh);
+                ff.mesh.geometry.dispose();
+                ff.mesh.material.dispose();
+                fireflies.splice(i, 1);
+            }
+        }
     }
 
     function scheduleGravityCheckAround(bx, by, bz) {
@@ -2227,7 +2682,9 @@
             ? window.UI.getSelectedBlockId()
             : 1;
         const heldDef = window.Blocks && window.Blocks.BLOCK_DEFS ? window.Blocks.BLOCK_DEFS[heldId] : null;
-        const toolMult = (heldDef && typeof heldDef.miningSpeedMultiplier === 'number') ? heldDef.miningSpeedMultiplier : 1.0;
+        const toolMult = typeof player.getMiningSpeedMultiplier === 'function'
+            ? player.getMiningSpeedMultiplier(heldId)
+            : ((heldDef && typeof heldDef.miningSpeedMultiplier === 'number') ? heldDef.miningSpeedMultiplier : 1.0);
 
         miningProgress += (dt * toolMult) / hardness;
         miningHitTimer -= dt;
@@ -2569,9 +3026,12 @@
 
         updateFallingBlocks(dt);
         updateDroppedItems(dt);
+        updateXPOrbs(dt);
+        updateArrows(dt);
         updateHeldBlock(dt);
         updateClouds(dt);
         updateWeather(dt);
+        updateAuroraAndFireflies(dt);
         updatePlayerModel(dt);
 
         if (mobManager && !isPaused) {
@@ -2587,10 +3047,44 @@
                         }
                     });
                 },
+                onSkeletonShoot: (skeleton, targetPlayer) => {
+                    const origin = {
+                        x: skeleton.position.x,
+                        y: skeleton.position.y + 1.4,
+                        z: skeleton.position.z
+                    };
+                    const dir = {
+                        x: targetPlayer.position.x - origin.x,
+                        y: (targetPlayer.position.y + 1.0) - origin.y,
+                        z: targetPlayer.position.z - origin.z
+                    };
+                    shootArrow(origin, dir, false, skeleton.def.attackDamage || 3, false);
+                    if (audio && typeof audio.playBowShoot === 'function') {
+                        audio.playBowShoot();
+                    }
+                },
+                onEndermanTeleport: (em, prevPos) => {
+                    if (audio && typeof audio.playEndermanTeleport === 'function') {
+                        audio.playEndermanTeleport();
+                    }
+                    if (prevPos) {
+                        for (let pi = 0; pi < 8; pi++) {
+                            const pm = new THREE.Mesh(
+                                new THREE.BoxGeometry(0.12, 0.12, 0.12),
+                                new THREE.MeshBasicMaterial({ color: 0xcc55ff })
+                            );
+                            pm.position.set(prevPos.x + (Math.random() - 0.5) * 0.6, prevPos.y + 1.0 + Math.random(), prevPos.z + (Math.random() - 0.5) * 0.6);
+                            scene.add(pm);
+                            particles.push({ mesh: pm, vel: { x: (Math.random() - 0.5) * 2.5, y: 2.0 + Math.random() * 2.0, z: (Math.random() - 0.5) * 2.5 }, life: 0.45 });
+                        }
+                    }
+                },
                 onMobKilled: (m) => {
                     if (m.def && m.def.dropBlockId) {
                         spawnItemDrop(Math.floor(m.position.x), Math.floor(m.position.y), Math.floor(m.position.z), m.def.dropBlockId);
                     }
+                    const xpReward = m.type === 'enderman' ? 12 : (m.hostile ? 6 : 3);
+                    spawnXPOrbs(m.position.x, m.position.y + 0.5, m.position.z, xpReward);
                 }
             });
         }

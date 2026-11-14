@@ -185,11 +185,21 @@ html, body {
     opacity: 0.35;
 }
 
+/* HUD Stats Row (Hearts + Hunger) */
+.hud-stats-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+    max-width: 452px;
+    margin-bottom: 4px;
+    gap: 16px;
+}
+
 /* Hearts Container */
 #hearts-bar {
     display: flex;
     gap: 3px;
-    margin-bottom: 6px;
 }
 
 .heart {
@@ -208,6 +218,73 @@ html, body {
 .heart.empty {
     background: #2a2a2a;
     opacity: 0.55;
+}
+
+.heart.golden {
+    background: linear-gradient(135deg, #fff176 0%, #ffb300 65%, #ff8f00 100%);
+    filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.9));
+}
+
+/* Hunger Bar */
+#hunger-bar {
+    display: flex;
+    gap: 3px;
+    flex-direction: row-reverse;
+}
+
+.drumstick {
+    width: 13px;
+    height: 13px;
+    background: radial-gradient(circle at 38% 38%, #e28743 0%, #a8541c 75%, #5c2b0a 100%);
+    border-radius: 50% 50% 45% 20%;
+    border: 1px solid #1e0d04;
+    filter: drop-shadow(1px 1px 0px #000);
+}
+
+.drumstick.half {
+    background: linear-gradient(to left, #c96e2d 50%, #2a2a2a 50%);
+}
+
+.drumstick.empty {
+    background: #2a2a2a;
+    opacity: 0.5;
+}
+
+/* XP Level Bar */
+#xp-bar-container {
+    position: relative;
+    width: 100%;
+    max-width: 452px;
+    height: 7px;
+    background: rgba(12, 16, 12, 0.85);
+    border: 1px solid #000;
+    border-radius: 2px;
+    margin-bottom: 6px;
+}
+
+#xp-bar-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #4cd938 0%, #8bff62 100%);
+    box-shadow: 0 0 6px rgba(100, 255, 90, 0.65);
+    transition: width 0.2s ease;
+}
+
+#xp-level-badge {
+    position: absolute;
+    left: 50%;
+    top: -11px;
+    transform: translateX(-50%);
+    font-family: Consolas, monospace;
+    font-size: 13px;
+    font-weight: bold;
+    color: #88ff55;
+    text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+    pointer-events: none;
+}
+
+.hotbar-slot.enchanted-slot {
+    box-shadow: inset 0 0 10px rgba(190, 90, 255, 0.85), 0 0 6px rgba(170, 70, 255, 0.55);
 }
 
 /* Hotbar */
@@ -1011,6 +1088,158 @@ body.touch-active #mobile-controls {
     .inventory-grid {
         grid-template-columns: repeat(4, 1fr);
     }
+    .hud-stats-row {
+        max-width: 310px;
+        gap: 6px;
+    }
+    #xp-bar-container {
+        max-width: 310px;
+    }
+}
+
+/* Inventory Station Tabs (Crafting / Furnace / Enchanting) */
+.stations-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.station-tab {
+    padding: 6px 14px;
+    background: #2b2b2b;
+    color: #cccccc;
+    border: 2px solid #141414;
+    border-radius: 3px;
+    font-family: Consolas, monospace;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: inset 1px 1px 0 #444;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+
+.station-tab:hover {
+    background: #3a3a3a;
+    color: #ffffff;
+}
+
+.station-tab.active {
+    background: #3c8527;
+    color: #ffffff;
+    border-color: #1f4b13;
+    box-shadow: inset 1px 1px 0 #6be34b;
+}
+
+/* Villager Trading Overlay */
+#trading-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(8, 12, 18, 0.72);
+    backdrop-filter: blur(5px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 65;
+}
+
+.trading-box {
+    width: 560px;
+    max-width: 94vw;
+    max-height: 82vh;
+    overflow-y: auto;
+    background: rgba(24, 28, 34, 0.96);
+    border: 3px solid #2b4a26;
+    border-radius: 8px;
+    padding: 18px 20px;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.85), inset 0 0 24px rgba(60, 180, 90, 0.12);
+    color: #f0f0f0;
+    font-family: Consolas, monospace;
+}
+
+.villager-level-badge {
+    display: inline-block;
+    margin-left: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: rgba(45, 165, 85, 0.25);
+    border: 1px solid #44dd77;
+    color: #88ffaa;
+    font-size: 11px;
+    vertical-align: middle;
+}
+
+.trading-emerald-status {
+    margin: 8px 0 12px 0;
+    padding: 8px 12px;
+    background: rgba(16, 42, 24, 0.75);
+    border: 1px solid #2b6b3e;
+    border-radius: 4px;
+    color: #7eff9e;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.trading-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.trade-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(42, 46, 54, 0.88);
+    border: 1px solid #4f5866;
+    border-radius: 5px;
+}
+
+.trade-card.locked {
+    opacity: 0.55;
+    border-style: dashed;
+}
+
+.trade-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.trade-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #ffffff;
+}
+
+.trade-sub {
+    font-size: 11px;
+    color: #b5c2d1;
+}
+
+.trade-btn {
+    padding: 7px 14px;
+    background: #2f8f46;
+    color: #ffffff;
+    border: 2px solid #165224;
+    border-radius: 4px;
+    font-family: Consolas, monospace;
+    font-weight: bold;
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.trade-btn:hover:not(:disabled) {
+    background: #3bb559;
+}
+
+.trade-btn:disabled {
+    background: #3a3d42;
+    border-color: #26282b;
+    color: #888;
+    cursor: not-allowed;
 }
 
 

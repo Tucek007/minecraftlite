@@ -68,6 +68,8 @@
             this.chunks = new Map();
             this.modifiedBlocks = new Map(); // key "x,y,z" => blockId for save/load persistence
             this.chunkModifications = new Map(); // key "cx,cz" => Map<number, blockId> (chunk index => blockId)
+            this.villages = [];
+            this.openDoors = new Set();
             this.sharedOpaqueMaterial = null;
             this.sharedWaterMaterial = null;
         }
@@ -186,9 +188,60 @@
             return res;
         }
 
+        getBlockKey(x, y, z) {
+            return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+        }
+
+        isDoorOpen(x, y, z) {
+            return this.openDoors.has(this.getBlockKey(x, y, z));
+        }
+
+        toggleDoor(x, y, z) {
+            const bx = Math.floor(x);
+            const by = Math.floor(y);
+            const bz = Math.floor(z);
+            const blockId = this.getBlock(bx, by, bz, false);
+            if (!Blocks || !Blocks.BLOCKS || blockId !== Blocks.BLOCKS.DOOR_OAK) return false;
+            const key = this.getBlockKey(bx, by, bz);
+            const nextOpen = !this.openDoors.has(key);
+            const applyState = (tx, ty, tz) => {
+                const k = this.getBlockKey(tx, ty, tz);
+                if (nextOpen) this.openDoors.add(k);
+                else this.openDoors.delete(k);
+                const ch = this.getChunk(Math.floor(tx / CHUNK_SIZE_X), Math.floor(tz / CHUNK_SIZE_Z), false);
+                if (ch) ch.dirty = true;
+            };
+            applyState(bx, by, bz);
+            for (const dy of [-1, 1]) {
+                if (this.getBlock(bx, by + dy, bz, false) === Blocks.BLOCKS.DOOR_OAK) {
+                    applyState(bx, by + dy, bz);
+                }
+            }
+            return true;
+        }
+
+        getHighestBlockY(x, z) {
+            const bx = Math.floor(x);
+            const bz = Math.floor(z);
+            const cx = Math.floor(bx / CHUNK_SIZE_X);
+            const cz = Math.floor(bz / CHUNK_SIZE_Z);
+            const chunk = this.getChunk(cx, cz, false);
+            if (!chunk) return 12;
+            const lx = ((bx % CHUNK_SIZE_X) + CHUNK_SIZE_X) % CHUNK_SIZE_X;
+            const lz = ((bz % CHUNK_SIZE_Z) + CHUNK_SIZE_Z) % CHUNK_SIZE_Z;
+            for (let ly = CHUNK_HEIGHT - 1; ly >= 0; ly--) {
+                const id = chunk.getBlock(lx, ly, lz);
+                if (id !== 0) return ly;
+            }
+            return 0;
+        }
+
         isSolid(x, y, z) {
             const blockId = this.getBlock(x, y, z);
             if (!blockId || !Blocks || !Blocks.BLOCK_DEFS[blockId]) return false;
+            if (Blocks.BLOCKS && blockId === Blocks.BLOCKS.DOOR_OAK && this.isDoorOpen(x, y, z)) {
+                return false;
+            }
             return Blocks.BLOCK_DEFS[blockId].solid;
         }
 
@@ -313,7 +366,9 @@
                             const oreHash = Math.sin(wx * 12.9898 + y * 78.233 + wz * 37.719) * 43758.5453;
                             const oreRand = oreHash - Math.floor(oreHash);
 
-                            if (y < 12 && oreRand < 0.015) {
+                            if (B.EMERALD_ORE !== undefined && biome === 'mountains' && y >= 8 && y < 34 && oreRand > 0.985) {
+                                blockType = B.EMERALD_ORE;
+                            } else if (y < 12 && oreRand < 0.015) {
                                 blockType = B.DIAMOND_ORE;
                             } else if (y < 20 && oreRand < 0.035) {
                                 blockType = B.GOLD_ORE;
@@ -474,6 +529,9 @@
                 }
             }
 
+            // Deterministic Village Generation in flat plains/forest chunks
+            this.generateVillageInChunk(chunk, heightMap, biomeMap);
+
             // Apply saved modifications if any exist for this chunk
             const chunkMods = this.chunkModifications.get(this.getChunkKey(chunk.chunkX, chunk.chunkZ));
             if (chunkMods && chunkMods.size > 0) {
@@ -484,6 +542,185 @@
             }
 
             chunk.dirty = true;
+        }
+
+        /**
+         * Procedurally generates a self-contained deterministic 16x16 village with
+         * central well, paths, houses, blacksmith/enchanting hall, farm, and street lanterns.
+         */
+        generateVillageInChunk(chunk, heightMap, biomeMap) {
+            const B = Blocks && Blocks.BLOCKS ? Blocks.BLOCKS : null;
+            if (!B) return;
+
+            const cx = chunk.chunkX;
+            const cz = chunk.chunkZ;
+            if (cx === 0 && cz === 0) return; // Keep spawn chunk terrain classic
+
+            const seedMix = Math.abs(((cx * 73856093) ^ (cz * 19349663) ^ ((this.seed | 0) * 83492791)) | 0);
+            const isGuaranteedNearCandidate = ((cx === 1 && cz === 1) || (cx === -1 && cz === 1));
+            if (!isGuaranteedNearCandidate && (seedMix % 11 !== 0)) return;
+
+            const centerCol = 8 * CHUNK_SIZE_Z + 8;
+            const centerBiome = biomeMap[centerCol];
+            if (centerBiome !== 'plains' && centerBiome !== 'forest') return;
+
+            const baseY = heightMap[centerCol];
+            if (baseY < SEA_LEVEL + 2 || baseY > SEA_LEVEL + 16 || baseY + 8 >= CHUNK_HEIGHT) return;
+
+            let minH = CHUNK_HEIGHT;
+            let maxH = 0;
+            for (let lx = 1; lx <= 14; lx++) {
+                for (let lz = 1; lz <= 14; lz++) {
+                    const h = heightMap[lx * CHUNK_SIZE_Z + lz];
+                    if (h < minH) minH = h;
+                    if (h > maxH) maxH = h;
+                }
+            }
+            if (maxH - minH > 6) return;
+
+            const setSafe = (lx, y, lz, blockId) => {
+                if (blockId === undefined || blockId === null) return;
+                if (lx < 0 || lx >= CHUNK_SIZE_X || lz < 0 || lz >= CHUNK_SIZE_Z) return;
+                if (y < 1 || y >= CHUNK_HEIGHT) return;
+                chunk.setBlock(lx, y, lz, blockId);
+            };
+
+            // Terrace plaza cleanly (1..14) and clear headroom (including trees)
+            for (let lx = 1; lx <= 14; lx++) {
+                for (let lz = 1; lz <= 14; lz++) {
+                    for (let y = Math.max(1, baseY - 3); y < baseY; y++) {
+                        setSafe(lx, y, lz, B.DIRT);
+                    }
+                    setSafe(lx, baseY, lz, B.GRASS);
+                    for (let y = baseY + 1; y <= Math.min(CHUNK_HEIGHT - 1, baseY + 12); y++) {
+                        setSafe(lx, y, lz, B.AIR);
+                    }
+                }
+            }
+
+            // Crossroads paths (GRAVEL + STONE_BRICKS accent)
+            const brickOrCobble = B.STONE_BRICKS !== undefined ? B.STONE_BRICKS : B.COBBLESTONE;
+            for (let i = 1; i <= 14; i++) {
+                setSafe(7, baseY, i, (i % 3 === 0) ? brickOrCobble : B.GRAVEL);
+                setSafe(8, baseY, i, (i % 4 === 0) ? brickOrCobble : B.GRAVEL);
+                setSafe(i, baseY, 7, (i % 3 === 0) ? brickOrCobble : B.GRAVEL);
+                setSafe(i, baseY, 8, (i % 4 === 0) ? brickOrCobble : B.GRAVEL);
+            }
+
+            // 1. Central Village Well (lx=6..8, lz=6..8)
+            for (let lx = 6; lx <= 8; lx++) {
+                for (let lz = 6; lz <= 8; lz++) {
+                    const isRim = (lx === 6 || lx === 8 || lz === 6 || lz === 8);
+                    setSafe(lx, baseY - 1, lz, B.COBBLESTONE);
+                    if (isRim) {
+                        setSafe(lx, baseY, lz, B.COBBLESTONE);
+                        setSafe(lx, baseY + 1, lz, ((lx + lz) % 2 === 0 && B.MOSSY_COBBLESTONE) ? B.MOSSY_COBBLESTONE : B.COBBLESTONE);
+                    } else {
+                        setSafe(lx, baseY, lz, B.WATER);
+                    }
+                    setSafe(lx, baseY + 4, lz, B.PLANKS);
+                }
+            }
+            for (const [px, pz] of [[6, 6], [8, 6], [6, 8], [8, 8]]) {
+                setSafe(px, baseY + 2, pz, B.WOOD);
+                setSafe(px, baseY + 3, pz, B.WOOD);
+            }
+            setSafe(7, baseY + 3, 7, B.LANTERN !== undefined ? B.LANTERN : B.TORCH);
+
+            // Helper to build a 5x5 cottage/structure
+            const buildStructure = (x0, z0, wallMat, cornerMat, roofMat, doorX, doorZ) => {
+                for (let lx = x0; lx <= x0 + 4; lx++) {
+                    for (let lz = z0; lz <= z0 + 4; lz++) {
+                        const isEdge = (lx === x0 || lx === x0 + 4 || lz === z0 || lz === z0 + 4);
+                        const isCorner = ((lx === x0 || lx === x0 + 4) && (lz === z0 || lz === z0 + 4));
+                        setSafe(lx, baseY, lz, isEdge ? B.COBBLESTONE : wallMat);
+                        if (isEdge) {
+                            for (let dy = 1; dy <= 3; dy++) {
+                                setSafe(lx, baseY + dy, lz, isCorner ? cornerMat : wallMat);
+                            }
+                        }
+                        setSafe(lx, baseY + 4, lz, roofMat);
+                    }
+                }
+                // Carve 2-high entrance door
+                setSafe(doorX, baseY + 1, doorZ, B.DOOR_OAK !== undefined ? B.DOOR_OAK : B.AIR);
+                setSafe(doorX, baseY + 2, doorZ, B.DOOR_OAK !== undefined ? B.DOOR_OAK : B.AIR);
+            };
+
+            // 2. Villager Cottage (NE: x=10..14, z=1..5)
+            buildStructure(10, 1, B.PLANKS, B.WOOD, B.PLANKS, 10, 3);
+            setSafe(12, baseY + 2, 1, B.GLASS);
+            setSafe(12, baseY + 2, 5, B.GLASS);
+            setSafe(14, baseY + 2, 3, B.GLASS);
+            for (let lx = 11; lx <= 13; lx++) {
+                for (let lz = 2; lz <= 4; lz++) {
+                    setSafe(lx, baseY + 5, lz, B.WOOD);
+                }
+            }
+            setSafe(13, baseY + 1, 2, B.BED);
+            setSafe(11, baseY + 1, 2, B.BOOKSHELF);
+            setSafe(11, baseY + 1, 4, B.CRAFTING_TABLE);
+            setSafe(13, baseY + 1, 4, B.CHEST !== undefined ? B.CHEST : B.PLANKS);
+            setSafe(12, baseY + 3, 3, B.TORCH);
+
+            // 3. Blacksmith & Enchanting Hall (NW: x=1..5, z=1..5)
+            buildStructure(1, 1, brickOrCobble, B.COBBLESTONE, brickOrCobble, 5, 3);
+            setSafe(3, baseY + 2, 1, B.GLASS);
+            setSafe(1, baseY + 2, 3, B.GLASS);
+            setSafe(3, baseY + 2, 5, B.GLASS);
+            setSafe(2, baseY + 1, 2, B.FURNACE !== undefined ? B.FURNACE : B.COBBLESTONE);
+            setSafe(2, baseY + 1, 3, B.ENCHANTING_TABLE !== undefined ? B.ENCHANTING_TABLE : B.CRAFTING_TABLE);
+            setSafe(2, baseY + 1, 4, B.BOOKSHELF);
+            setSafe(4, baseY + 1, 2, B.CHEST !== undefined ? B.CHEST : B.PLANKS);
+            setSafe(3, baseY + 3, 3, B.LANTERN !== undefined ? B.LANTERN : B.TORCH);
+
+            // 4. Scholar Library Cottage (SE: x=10..14, z=10..14)
+            buildStructure(10, 10, B.PLANKS, B.WOOD, B.PLANKS, 10, 12);
+            setSafe(12, baseY + 2, 14, B.GLASS);
+            setSafe(14, baseY + 2, 12, B.GLASS);
+            setSafe(13, baseY + 1, 11, B.BOOKSHELF);
+            setSafe(13, baseY + 2, 11, B.BOOKSHELF);
+            setSafe(13, baseY + 1, 12, B.BOOKSHELF);
+            setSafe(13, baseY + 1, 13, B.BOOKSHELF);
+            setSafe(11, baseY + 1, 13, B.BED);
+            setSafe(12, baseY + 3, 12, B.TORCH);
+            setSafe(9, baseY + 3, 12, B.LANTERN !== undefined ? B.LANTERN : B.TORCH);
+
+            // 5. Irrigated Wheat Farm (SW: x=1..5, z=10..14)
+            for (let lx = 1; lx <= 5; lx++) {
+                for (let lz = 10; lz <= 14; lz++) {
+                    const isCurb = (lx === 1 || lx === 5 || lz === 10 || lz === 14);
+                    if (isCurb) {
+                        setSafe(lx, baseY, lz, B.WOOD);
+                    } else if (lx === 3) {
+                        setSafe(lx, baseY - 1, lz, B.DIRT);
+                        setSafe(lx, baseY, lz, B.WATER);
+                    } else {
+                        setSafe(lx, baseY, lz, B.FARMLAND !== undefined ? B.FARMLAND : B.DIRT);
+                        setSafe(lx, baseY + 1, lz, B.WHEAT !== undefined ? B.WHEAT : B.TALL_GRASS);
+                    }
+                }
+            }
+
+            // 6. Street Lantern Posts
+            for (const [px, pz] of [[6, 10], [9, 5]]) {
+                setSafe(px, baseY + 1, pz, B.WOOD);
+                setSafe(px, baseY + 2, pz, B.WOOD);
+                setSafe(px, baseY + 3, pz, B.LANTERN !== undefined ? B.LANTERN : B.TORCH);
+            }
+
+            const key = this.getChunkKey(cx, cz);
+            if (!this.villages.some(v => v.key === key)) {
+                this.villages.push({
+                    key,
+                    cx,
+                    cz,
+                    x: cx * CHUNK_SIZE_X + 7.5,
+                    y: baseY + 1,
+                    z: cz * CHUNK_SIZE_Z + 7.5,
+                    populated: false
+                });
+            }
         }
 
         buildChunkMesh(chunk, THREE, atlasTexture) {
@@ -506,6 +743,67 @@
             const faceShades = [0.7, 0.7, 1.0, 0.5, 0.8, 0.8]; // +X, -X, +Y, -Y, +Z, -Z
             const aoTable = [0.5, 0.68, 0.84, 1.0];
 
+            // Gather nearby light emitters for smooth colored vertex lighting
+            const lightSources = [];
+            const BLOCK_DEFS = Blocks && Blocks.BLOCK_DEFS ? Blocks.BLOCK_DEFS : {};
+            const BLOCKS_REF = Blocks && Blocks.BLOCKS ? Blocks.BLOCKS : {};
+            for (let sx = -4; sx < CHUNK_SIZE_X + 4; sx++) {
+                const swx = cxWorld + sx;
+                const inChunkX = (sx >= 0 && sx < CHUNK_SIZE_X);
+                for (let sz = -4; sz < CHUNK_SIZE_Z + 4; sz++) {
+                    const swz = czWorld + sz;
+                    const inChunk = inChunkX && (sz >= 0 && sz < CHUNK_SIZE_Z);
+                    for (let sy = 0; sy < CHUNK_HEIGHT; sy++) {
+                        const bId = inChunk ? chunk.getBlock(sx, sy, sz) : this.getBlock(swx, sy, swz, false);
+                        if (!bId) continue;
+                        const def = BLOCK_DEFS[bId];
+                        if (def && def.lightLevel > 0) {
+                            let lr = 1.0, lg = 0.78, lb = 0.42;
+                            if (bId === BLOCKS_REF.ENCHANTING_TABLE) {
+                                lr = 0.45; lg = 0.72; lb = 1.0;
+                            } else if (bId === BLOCKS_REF.LAVA) {
+                                lr = 1.0; lg = 0.44; lb = 0.12;
+                            } else if (bId === BLOCKS_REF.LANTERN) {
+                                lr = 1.0; lg = 0.82; lb = 0.46;
+                            }
+                            lightSources.push({ x: swx, y: sy, z: swz, level: def.lightLevel, r: lr, g: lg, b: lb });
+                        }
+                    }
+                }
+            }
+
+            const computeVertexColor = (vx, vy, vz, baseShade, tintR = 1.0, tintG = 1.0, tintB = 1.0) => {
+                if (lightSources.length === 0 && tintR === 1.0 && tintG === 1.0 && tintB === 1.0) {
+                    return [baseShade, baseShade, baseShade];
+                }
+                let r = baseShade * tintR;
+                let g = baseShade * tintG;
+                let b = baseShade * tintB;
+                if (lightSources.length > 0) {
+                    let addR = 0, addG = 0, addB = 0;
+                    for (let i = 0; i < lightSources.length; i++) {
+                        const src = lightSources[i];
+                        const dx = vx - (src.x + 0.5);
+                        const dy = vy - (src.y + 0.5);
+                        const dz = vz - (src.z + 0.5);
+                        const d2 = dx * dx + dy * dy + dz * dz;
+                        if (d2 >= 36.0) continue;
+                        const dist = Math.sqrt(d2);
+                        const falloff = (1.0 - dist / 6.0) * (src.level / 15.0);
+                        const cr = falloff * src.r * 0.55;
+                        const cg = falloff * src.g * 0.42;
+                        const cb = falloff * src.b * 0.30;
+                        if (cr > addR) addR = cr;
+                        if (cg > addG) addG = cg;
+                        if (cb > addB) addB = cb;
+                    }
+                    r = Math.min(1.0, r + addR);
+                    g = Math.min(1.0, g + addG);
+                    b = Math.min(1.0, b + addB);
+                }
+                return [r, g, b];
+            };
+
             for (let lx = 0; lx < CHUNK_SIZE_X; lx++) {
                 const wx = cxWorld + lx;
                 for (let ly = 0; ly < CHUNK_HEIGHT; ly++) {
@@ -523,11 +821,47 @@
                         const selfDef = (Blocks && Blocks.BLOCK_DEFS) ? Blocks.BLOCK_DEFS[blockId] : null;
                         const selfEmits = !!(selfDef && selfDef.lightLevel > 0);
 
-                        // X-Mesh crossed diagonal billboards for flowers, tall grass, and torches
+                        // Thin 3D interactive Oak Door panel (rotates open when clicked)
+                        if (BLOCKS_REF.DOOR_OAK !== undefined && blockId === BLOCKS_REF.DOOR_OAK) {
+                            const doorOpen = this.isDoorOpen(wx, ly, wz);
+                            const wallAlongX = this.isSolid(wx - 1, ly, wz) || this.isSolid(wx + 1, ly, wz);
+                            let x0 = wx, x1 = wx + 1, z0 = wz, z1 = wz + 1;
+                            if (wallAlongX) {
+                                if (!doorOpen) { z0 = wz + 0.42; z1 = wz + 0.58; }
+                                else { x0 = wx + 0.02; x1 = wx + 0.18; }
+                            } else {
+                                if (!doorOpen) { x0 = wx + 0.42; x1 = wx + 0.58; }
+                                else { z0 = wz + 0.02; z1 = wz + 0.18; }
+                            }
+                            const y0 = ly, y1 = ly + 1;
+                            const tileIdx = Blocks.getBlockFaceTexture(blockId, 0);
+                            const { u0, v0, u1, v1 } = Blocks.getTileUV(tileIdx);
+                            const doorFaces = [
+                                [x1, y0, z1,  x1, y0, z0,  x1, y1, z0,  x1, y1, z1,   1, 0, 0, faceShades[0]],
+                                [x0, y0, z0,  x0, y0, z1,  x0, y1, z1,  x0, y1, z0,  -1, 0, 0, faceShades[1]],
+                                [x0, y1, z1,  x1, y1, z1,  x1, y1, z0,  x0, y1, z0,   0, 1, 0, faceShades[2]],
+                                [x0, y0, z0,  x1, y0, z0,  x1, y0, z1,  x0, y0, z1,   0,-1, 0, faceShades[3]],
+                                [x0, y0, z1,  x1, y0, z1,  x1, y1, z1,  x0, y1, z1,   0, 0, 1, faceShades[4]],
+                                [x1, y0, z0,  x0, y0, z0,  x0, y1, z0,  x1, y1, z0,   0, 0,-1, faceShades[5]]
+                            ];
+                            for (const df of doorFaces) {
+                                const c = computeVertexColor(wx + 0.5, ly + 0.5, wz + 0.5, df[15]);
+                                targetPos.push(df[0], df[1], df[2], df[3], df[4], df[5], df[6], df[7], df[8], df[0], df[1], df[2], df[6], df[7], df[8], df[9], df[10], df[11]);
+                                targetUvs.push(u0, v0, u1, v0, u1, v1, u0, v0, u1, v1, u0, v1);
+                                for (let k = 0; k < 6; k++) {
+                                    targetNorm.push(df[12], df[13], df[14]);
+                                    targetColors.push(c[0], c[1], c[2]);
+                                }
+                            }
+                            continue;
+                        }
+
+                        // X-Mesh crossed diagonal billboards for flowers, tall grass, wheat, lanterns, and torches
                         if (selfDef && selfDef.crossMesh) {
                             const tileIdx = Blocks.getBlockFaceTexture(blockId, 0);
                             const { u0, v0, u1, v1 } = Blocks.getTileUV(tileIdx);
                             const cShade = selfEmits ? 1.0 : 0.92;
+                            const cCol = selfEmits ? [1.0, 1.0, 1.0] : computeVertexColor(wx + 0.5, ly + 0.5, wz + 0.5, cShade);
                             const x0 = wx + 0.15, x1 = wx + 0.85;
                             const y0 = ly,        y1 = ly + 0.90;
                             const z0 = wz + 0.15, z1 = wz + 0.85;
@@ -554,7 +888,7 @@
                                 );
                                 for (let k = 0; k < 6; k++) {
                                     targetNorm.push(q[12], q[13], q[14]);
-                                    targetColors.push(cShade, cShade, cShade);
+                                    targetColors.push(cCol[0], cCol[1], cCol[2]);
                                 }
                             }
                             continue;
@@ -596,31 +930,32 @@
                                 shade = Math.min(1.0, shade * 1.32);
                             }
 
-                            // Vertex coordinates for 6 faces
+                            // Vertex coordinates for 6 faces (lower surface for non-submerged water)
+                            const topY = (isWater && neighbors[2] !== Blocks.BLOCKS.WATER) ? ly + 0.88 : ly + 1;
                             let p = [];
                             let norm = [];
                             if (f === 0) { // +X
                                 p = [
                                     wx + 1, ly, wz + 1,
                                     wx + 1, ly, wz,
-                                    wx + 1, ly + 1, wz,
-                                    wx + 1, ly + 1, wz + 1
+                                    wx + 1, topY, wz,
+                                    wx + 1, topY, wz + 1
                                 ];
                                 norm = [1, 0, 0];
                             } else if (f === 1) { // -X
                                 p = [
                                     wx, ly, wz,
                                     wx, ly, wz + 1,
-                                    wx, ly + 1, wz + 1,
-                                    wx, ly + 1, wz
+                                    wx, topY, wz + 1,
+                                    wx, topY, wz
                                 ];
                                 norm = [-1, 0, 0];
                             } else if (f === 2) { // +Y
                                 p = [
-                                    wx, ly + 1, wz + 1,
-                                    wx + 1, ly + 1, wz + 1,
-                                    wx + 1, ly + 1, wz,
-                                    wx, ly + 1, wz
+                                    wx, topY, wz + 1,
+                                    wx + 1, topY, wz + 1,
+                                    wx + 1, topY, wz,
+                                    wx, topY, wz
                                 ];
                                 norm = [0, 1, 0];
                             } else if (f === 3) { // -Y
@@ -635,21 +970,22 @@
                                 p = [
                                     wx, ly, wz + 1,
                                     wx + 1, ly, wz + 1,
-                                    wx + 1, ly + 1, wz + 1,
-                                    wx, ly + 1, wz + 1
+                                    wx + 1, topY, wz + 1,
+                                    wx, topY, wz + 1
                                 ];
                                 norm = [0, 0, 1];
                             } else if (f === 5) { // -Z
                                 p = [
                                     wx + 1, ly, wz,
                                     wx, ly, wz,
-                                    wx, ly + 1, wz,
-                                    wx + 1, ly + 1, wz
+                                    wx, topY, wz,
+                                    wx + 1, topY, wz
                                 ];
                                 norm = [0, 0, -1];
                             }
 
                             if (isWater) {
+                                const wCol = computeVertexColor(wx + 0.5, topY, wz + 0.5, shade, 0.90, 0.96, 1.0);
                                 // 2 Triangles (indices 0, 1, 2 and 0, 2, 3)
                                 // Triangle 1
                                 targetPos.push(
@@ -676,7 +1012,7 @@
 
                                 for (let k = 0; k < 6; k++) {
                                     targetNorm.push(norm[0], norm[1], norm[2]);
-                                    targetColors.push(shade, shade, shade);
+                                    targetColors.push(wCol[0], wCol[1], wCol[2]);
                                 }
                             } else {
                                 // Compute AO for 4 vertices
@@ -722,18 +1058,15 @@
                                     ao3 = aos[3];
                                 }
 
-                                let s0, s1, s2, s3;
-                                if (selfEmits) {
-                                    s0 = 1.0;
-                                    s1 = 1.0;
-                                    s2 = 1.0;
-                                    s3 = 1.0;
-                                } else {
-                                    s0 = shade * aoTable[ao0];
-                                    s1 = shade * aoTable[ao1];
-                                    s2 = shade * aoTable[ao2];
-                                    s3 = shade * aoTable[ao3];
-                                }
+                                const s0 = selfEmits ? 1.0 : shade * aoTable[ao0];
+                                const s1 = selfEmits ? 1.0 : shade * aoTable[ao1];
+                                const s2 = selfEmits ? 1.0 : shade * aoTable[ao2];
+                                const s3 = selfEmits ? 1.0 : shade * aoTable[ao3];
+
+                                const c0 = selfEmits ? [1.0, 1.0, 1.0] : computeVertexColor(p[0], p[1], p[2], s0);
+                                const c1 = selfEmits ? [1.0, 1.0, 1.0] : computeVertexColor(p[3], p[4], p[5], s1);
+                                const c2 = selfEmits ? [1.0, 1.0, 1.0] : computeVertexColor(p[6], p[7], p[8], s2);
+                                const c3 = selfEmits ? [1.0, 1.0, 1.0] : computeVertexColor(p[9], p[10], p[11], s3);
 
                                 const flip = (ao0 + ao2 < ao1 + ao3);
                                 if (!flip) {
@@ -749,9 +1082,9 @@
                                         u1, v1
                                     );
                                     targetColors.push(
-                                        s0, s0, s0,
-                                        s1, s1, s1,
-                                        s2, s2, s2
+                                        c0[0], c0[1], c0[2],
+                                        c1[0], c1[1], c1[2],
+                                        c2[0], c2[1], c2[2]
                                     );
 
                                     // Triangle 2: (0, 2, 3)
@@ -766,9 +1099,9 @@
                                         u0, v1
                                     );
                                     targetColors.push(
-                                        s0, s0, s0,
-                                        s2, s2, s2,
-                                        s3, s3, s3
+                                        c0[0], c0[1], c0[2],
+                                        c2[0], c2[1], c2[2],
+                                        c3[0], c3[1], c3[2]
                                     );
                                 } else {
                                     // Flipped diagonal: (0, 1, 3) and (1, 2, 3)
@@ -784,9 +1117,9 @@
                                         u0, v1
                                     );
                                     targetColors.push(
-                                        s0, s0, s0,
-                                        s1, s1, s1,
-                                        s3, s3, s3
+                                        c0[0], c0[1], c0[2],
+                                        c1[0], c1[1], c1[2],
+                                        c3[0], c3[1], c3[2]
                                     );
 
                                     // Triangle 2: (1, 2, 3)
@@ -801,9 +1134,9 @@
                                         u0, v1
                                     );
                                     targetColors.push(
-                                        s1, s1, s1,
-                                        s2, s2, s2,
-                                        s3, s3, s3
+                                        c1[0], c1[1], c1[2],
+                                        c2[0], c2[1], c2[2],
+                                        c3[0], c3[1], c3[2]
                                     );
                                 }
 
@@ -892,7 +1225,8 @@
         saveToJSON() {
             const data = {
                 seed: this.seed,
-                modifications: Array.from(this.modifiedBlocks.entries())
+                modifications: Array.from(this.modifiedBlocks.entries()),
+                openDoors: Array.from(this.openDoors)
             };
             return JSON.stringify(data);
         }
@@ -908,6 +1242,8 @@
                 this.caveNoise = new PerlinNoise(this.seed + 2039);
                 this.modifiedBlocks.clear();
                 this.chunkModifications.clear();
+                this.villages = [];
+                this.openDoors.clear();
                 if (data.modifications) {
                     for (const [key, id] of data.modifications) {
                         const parts = key.split(',');
@@ -915,6 +1251,11 @@
                         const my = parseInt(parts[1], 10);
                         const mz = parseInt(parts[2], 10);
                         this._recordModification(mx, my, mz, id);
+                    }
+                }
+                if (Array.isArray(data.openDoors)) {
+                    for (const dk of data.openDoors) {
+                        this.openDoors.add(dk);
                     }
                 }
                 // Clear and regenerate loaded chunks

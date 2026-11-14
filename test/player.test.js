@@ -468,4 +468,47 @@ describe('PlayerController tests', () => {
         player.update(0.016);
         assert.strictEqual(player.health, 17, 'Player should not take damage during cooldown');
     });
+
+    test('Hunger, Food (Bread & Golden Apple absorption), XP leveling, and Enchantment multipliers', () => {
+        const { camera, domElement, world, audio } = createMockSetup();
+        const Blocks = require('../js/blocks.js');
+        const player = new PlayerController(camera, domElement, world, audio);
+
+        assert.strictEqual(player.hunger, 20);
+        assert.strictEqual(player.xpLevel, 0);
+
+        player.hunger = 10;
+        player.health = 14;
+        assert.strictEqual(player.eatFood(Blocks.BLOCKS.BREAD), true);
+        assert.strictEqual(player.hunger, 16, 'Bread restores 6 hunger');
+        assert.strictEqual(player.health, 18, 'Bread heals 4 HP');
+
+        assert.strictEqual(player.eatFood(Blocks.BLOCKS.GOLDEN_APPLE), true);
+        assert.strictEqual(player.hunger, 20);
+        assert.strictEqual(player.health, 20);
+        assert.strictEqual(player.absorption, 4, 'Golden Apple grants 4 absorption HP');
+
+        // Golden absorption absorbs damage before health drops
+        player.takeDamage(3);
+        assert.strictEqual(player.absorption, 1);
+        assert.strictEqual(player.health, 20);
+        player.takeDamage(3);
+        assert.strictEqual(player.absorption, 0);
+        assert.strictEqual(player.health, 18);
+
+        // XP gain and level-up
+        const req0 = player.getXPRequired(0);
+        assert.strictEqual(player.addXP(req0 + 5), true, 'Adding required XP triggers level up');
+        assert.strictEqual(player.xpLevel, 1);
+        assert.strictEqual(player.xp, 5);
+
+        // Efficiency & Sharpness enchantments scale speed and melee damage
+        const baseSpeed = player.getMiningSpeedMultiplier(Blocks.BLOCKS.PICKAXE_DIAMOND);
+        player.enchantments.efficiency = 2;
+        assert.ok(player.getMiningSpeedMultiplier(Blocks.BLOCKS.PICKAXE_DIAMOND) > baseSpeed * 1.6);
+
+        const baseSword = player.getAttackDamage(Blocks.BLOCKS.SWORD_DIAMOND);
+        player.enchantments.sharpness = 2;
+        assert.strictEqual(player.getAttackDamage(Blocks.BLOCKS.SWORD_DIAMOND), baseSword + 8);
+    });
 });

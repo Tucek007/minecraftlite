@@ -437,9 +437,9 @@ describe('Improvements & Roadmap Verification Tests', () => {
                     UI.buildInventoryGrid();
                 }, 'buildInventoryGrid must not throw when HTMLElement has getter-only dataset');
 
-                assert.strictEqual(gridChildren.length, 38, 'Should have created 38 block/tool inventory slots');
+                assert.strictEqual(gridChildren.length, 51, 'Should have created 51 block/tool/food inventory slots');
                 assert.strictEqual(gridChildren[0].dataset.blockId, 1, 'First slot blockId should be 1');
-                assert.strictEqual(gridChildren[37].dataset.blockId, 38, 'Last slot blockId should be 38');
+                assert.strictEqual(gridChildren[50].dataset.blockId, 51, 'Last slot blockId should be 51');
             } finally {
                 global.document = originalDoc;
             }
@@ -479,11 +479,47 @@ describe('Improvements & Roadmap Verification Tests', () => {
                     UI.buildInventoryGrid();
                 }, 'buildInventoryGrid must not throw even if dataset throws on access');
 
-                assert.strictEqual(gridChildren.length, 38, 'Should have created 38 block/tool inventory slots');
+                assert.strictEqual(gridChildren.length, 51, 'Should have created 51 block/tool/food inventory slots');
                 assert.strictEqual(gridChildren[0]['data-block-id'], 1, 'Attribute fallback stores block ID');
             } finally {
                 global.document = originalDoc;
             }
+        });
+
+        test('SoundFX advanced SFX methods & UI smelting/enchanting/trading workflow', () => {
+            const SoundFX = require('../js/audio.js');
+            const Blocks = require('../js/blocks.js');
+            const Mobs = require('../js/mobs.js');
+            const UI = require('../js/ui.js');
+            const PlayerController = require('../js/player.js');
+
+            const fx = new SoundFX();
+            for (const fn of ['playVillagerSound', 'playBowShoot', 'playXpPickup', 'playLevelUp', 'playEat', 'playDoor', 'playEndermanTeleport']) {
+                assert.strictEqual(typeof fx[fn], 'function', `SoundFX.${fn} must be a function`);
+            }
+
+            const p = new PlayerController({}, null, { isSolid: () => false, getBlock: () => 0, isWater: () => false }, fx);
+            p.xpLevel = 5;
+            p.gameMode = 'survival';
+            UI.player = p;
+            UI.gameMode = 'survival';
+            UI.inventoryCounts = { [Blocks.BLOCKS.EMERALD_ORE]: 4, [Blocks.BLOCKS.WHEAT]: 8, [Blocks.BLOCKS.COAL_ORE]: 2 };
+
+            // Enchant Efficiency
+            assert.strictEqual(UI.enchantItem('efficiency'), true);
+            assert.strictEqual(p.enchantments.efficiency, 1);
+
+            // Smelt Bread
+            const breadRecipe = Blocks.SMELTING_RECIPES.find(r => r.id === 'smelt_bread');
+            assert.ok(breadRecipe);
+            assert.strictEqual(UI.smeltRecipe(breadRecipe), true);
+            assert.strictEqual(UI.getItemCount(Blocks.BLOCKS.BREAD), 2);
+
+            // Execute Villager Trade
+            const villager = new Mobs.Mob('villager', 0, 0, 0, 1, { profession: 'farmer' });
+            UI.activeVillager = villager;
+            assert.strictEqual(UI.executeTrade(0), true); // 4 Wheat -> 1 Emerald
+            assert.strictEqual(UI.getItemCount(Blocks.BLOCKS.EMERALD_ORE), 5);
         });
 
         test('UI Manager crafting system (addCollectedItem, getItemCount, canCraftRecipe in survival vs peaceful/creative, craftRecipe)', () => {

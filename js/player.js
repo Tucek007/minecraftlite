@@ -81,6 +81,15 @@
             this.shakeTimer = 0;
             this.shakeIntensity = 0;
 
+            // Survival Hunger, Golden Apple Absorption, XP & Enchantments
+            this.hunger = 20;
+            this.maxHunger = 20;
+            this.absorption = 0;
+            this.xp = 0;
+            this.xpLevel = 0;
+            this.hungerTimer = 0;
+            this.enchantments = { efficiency: 0, sharpness: 0, flame: 0 };
+
             // Input state
             this.keys = {};
             this.isLocked = false;
@@ -170,7 +179,13 @@
                     UI.updateGameMode(this.gameMode);
                 }
                 if (typeof UI.updateHealth === 'function') {
-                    UI.updateHealth(this.health);
+                    UI.updateHealth(this.health, this.absorption);
+                }
+                if (typeof UI.updateHunger === 'function') {
+                    UI.updateHunger(this.hunger, this.maxHunger);
+                }
+                if (typeof UI.updateXP === 'function') {
+                    UI.updateXP(this.xp, this.getXPRequired(this.xpLevel), this.xpLevel);
                 }
                 if (typeof UI.updateOxygen === 'function') {
                     UI.updateOxygen(this.oxygen, this.maxOxygen);
@@ -527,7 +542,7 @@
 
             // Health regeneration
             this.timeSinceLastDamage += delta;
-            if (this.health > 0 && this.health < this.maxHealth) {
+            if (this.health > 0 && this.health < this.maxHealth && this.hunger >= 6) {
                 const delayReq = (this.gameMode === 'peaceful') ? 1.5 : 4.0;
                 const intervalReq = (this.gameMode === 'peaceful') ? 1.0 : 2.5;
                 if (this.timeSinceLastDamage >= delayReq) {
@@ -536,7 +551,22 @@
                         this.regenTimer = 0;
                         this.health = Math.min(this.maxHealth, this.health + 1);
                         if (UI && typeof UI.updateHealth === 'function') {
-                            UI.updateHealth(this.health);
+                            UI.updateHealth(this.health, this.absorption);
+                        }
+                    }
+                }
+            }
+
+            // Gentle Hunger depletion while sprinting in Survival
+            if (this.gameMode === 'survival' && this.isSprinting && !this.isFlying &&
+                (Math.abs(this.velocity.x) > 0.5 || Math.abs(this.velocity.z) > 0.5)) {
+                this.hungerTimer += delta;
+                if (this.hungerTimer >= 15.0) {
+                    this.hungerTimer = 0;
+                    if (this.hunger > 6) {
+                        this.hunger = Math.max(6, this.hunger - 1);
+                        if (UI && typeof UI.updateHunger === 'function') {
+                            UI.updateHunger(this.hunger, this.maxHunger);
                         }
                     }
                 }
@@ -754,11 +784,101 @@
             return !collides;
         }
 
+        getXPRequired(level = this.xpLevel) {
+            return 20 + Math.max(0, level) * 10;
+        }
+
+        addXP(amount) {
+            if (!amount || amount <= 0) return false;
+            this.xp += amount;
+            let leveledUp = false;
+            while (this.xp >= this.getXPRequired(this.xpLevel)) {
+                this.xp -= this.getXPRequired(this.xpLevel);
+                this.xpLevel++;
+                leveledUp = true;
+            }
+            const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
+            if (UI) {
+                if (typeof UI.updateXP === 'function') {
+                    UI.updateXP(this.xp, this.getXPRequired(this.xpLevel), this.xpLevel);
+                }
+                if (leveledUp && typeof UI.showToast === 'function') {
+                    UI.showToast(`Level Up! Nová úroveň: ${this.xpLevel}`);
+                }
+            }
+            if (leveledUp && this.audio && typeof this.audio.playLevelUp === 'function') {
+                this.audio.playLevelUp();
+            }
+            return leveledUp;
+        }
+
+        eatFood(blockId) {
+            const def = Blocks && Blocks.BLOCK_DEFS ? Blocks.BLOCK_DEFS[blockId] : null;
+            if (!def || !def.isFood) return false;
+            if (this.hunger >= this.maxHunger && this.health >= this.maxHealth && !(def.absorption > 0)) {
+                return false;
+            }
+
+            if (def.hungerRestore) {
+                this.hunger = Math.min(this.maxHunger, this.hunger + def.hungerRestore);
+            }
+            if (def.healAmount) {
+                this.health = Math.min(this.maxHealth, this.health + def.healAmount);
+            }
+            if (def.absorption) {
+                this.absorption = Math.max(this.absorption, def.absorption);
+            }
+
+            if (this.audio && typeof this.audio.playEat === 'function') {
+                this.audio.playEat();
+            }
+
+            const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
+            if (UI) {
+                if (this.gameMode === 'survival' && typeof UI.removeItem === 'function') {
+                    UI.removeItem(blockId, 1);
+                }
+                if (typeof UI.updateHealth === 'function') {
+                    UI.updateHealth(this.health, this.absorption);
+                }
+                if (typeof UI.updateHunger === 'function') {
+                    UI.updateHunger(this.hunger, this.maxHunger);
+                }
+            }
+            return true;
+        }
+
+        getMiningSpeedMultiplier(heldBlockId) {
+            const B = Blocks && Blocks.BLOCKS ? Blocks.BLOCKS : {};
+            const isPick = (heldBlockId === B.PICKAXE_DIAMOND);
+            const base = isPick ? 3.5 : 1.0;
+            const eff = isPick ? (this.enchantments && this.enchantments.efficiency ? this.enchantments.efficiency : 0) : 0;
+            return base * (1.0 + eff * 0.35);
+        }
+
+        getAttackDamage(heldBlockId) {
+            const B = Blocks && Blocks.BLOCKS ? Blocks.BLOCKS : {};
+            const def = Blocks && Blocks.BLOCK_DEFS ? Blocks.BLOCK_DEFS[heldBlockId] : null;
+            const base = (def && def.attackDamage) ? def.attackDamage : 2;
+            const sharp = (heldBlockId === B.SWORD_DIAMOND && this.enchantments && this.enchantments.sharpness)
+                ? this.enchantments.sharpness * 4
+                : 0;
+            return base + sharp;
+        }
+
         takeDamage(amount) {
             if (this.isFlying || this.gameMode === 'creative') return;
             this.timeSinceLastDamage = 0;
             this.regenTimer = 0;
-            this.health = Math.max(0, this.health - amount);
+
+            let remaining = amount;
+            if (this.absorption > 0) {
+                const absorbed = Math.min(this.absorption, remaining);
+                this.absorption -= absorbed;
+                remaining -= absorbed;
+            }
+            this.health = Math.max(0, this.health - remaining);
+
             this.addScreenShake(0.18, 0.25);
             if (this.audio && typeof this.audio.playHurt === 'function') {
                 this.audio.playHurt();
@@ -766,7 +886,7 @@
             const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
             if (UI) {
                 if (typeof UI.updateHealth === 'function') {
-                    UI.updateHealth(this.health);
+                    UI.updateHealth(this.health, this.absorption);
                 }
                 if (typeof UI.triggerDamageFlash === 'function') {
                     UI.triggerDamageFlash();
@@ -806,6 +926,8 @@
 
         respawn() {
             this.health = this.maxHealth;
+            this.hunger = this.maxHunger;
+            this.absorption = 0;
             this.oxygen = this.maxOxygen;
             this.drownTimer = 0;
             this.timeSinceLastDamage = 0;
@@ -830,7 +952,10 @@
             this.onGround = true;
             const UI = (g && g.UI) || (typeof window !== 'undefined' ? window.UI : null);
             if (UI && typeof UI.updateHealth === 'function') {
-                UI.updateHealth(this.health);
+                UI.updateHealth(this.health, this.absorption);
+            }
+            if (UI && typeof UI.updateHunger === 'function') {
+                UI.updateHunger(this.hunger, this.maxHunger);
             }
             if (UI && typeof UI.updateOxygen === 'function') {
                 UI.updateOxygen(this.oxygen, this.maxOxygen);

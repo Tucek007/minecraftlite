@@ -136,6 +136,13 @@
             this.heartsBarEl = document.getElementById('hearts-bar');
 
             this.bubblesBarEl = document.getElementById('bubbles-bar');
+            this.hungerBarEl = document.getElementById('hunger-bar');
+            this.xpBarFillEl = document.getElementById('xp-bar-fill');
+            this.xpLevelBadgeEl = document.getElementById('xp-level-badge');
+            this.tradingOverlayEl = document.getElementById('trading-overlay');
+            this.activeStation = 'crafting';
+            this.activeVillager = null;
+            this.isTradingOpen = false;
             this.modeIndicatorEl = document.getElementById('mode-indicator');
             this.craftingGridEl = document.getElementById('crafting-grid');
             this.gameModeBtn = document.getElementById('btn-gamemode');
@@ -158,18 +165,39 @@
                 this.invGameModeBtn.addEventListener('click', handleModeCycle);
             }
 
+            // Station tab buttons (Crafting / Smelting / Enchanting)
+            const stationTabs = document.querySelectorAll ? document.querySelectorAll('.station-tab') : [];
+            if (stationTabs && stationTabs.forEach) {
+                stationTabs.forEach((tab) => {
+                    tab.addEventListener('click', () => {
+                        const st = tab.getAttribute ? tab.getAttribute('data-station') : (tab.dataset ? tab.dataset.station : 'crafting');
+                        this.switchInventoryStation(st || 'crafting');
+                    });
+                });
+            }
+
+            const tradingCloseBtn = document.getElementById('btn-trading-close');
+            if (tradingCloseBtn) {
+                tradingCloseBtn.addEventListener('click', () => this.closeTradingModal());
+            }
+
             this.initSettingsUI();
 
             this.buildHotbar();
             this.buildInventoryGrid();
             this.buildCraftingGrid();
+            this.buildSmeltingGrid();
+            this.buildEnchantingGrid();
             this.updateGameMode(this.player && this.player.gameMode ? this.player.gameMode : 'survival');
 
             if (this.player && this.player.selectedSlot !== undefined) {
                 this.updateActiveSlot(this.player.selectedSlot);
             }
             if (this.player) {
-                this.updateHealth(this.player.health !== undefined ? this.player.health : 20);
+                this.updateHealth(this.player.health !== undefined ? this.player.health : 20, this.player.absorption || 0);
+                this.updateHunger(this.player.hunger !== undefined ? this.player.hunger : 20, this.player.maxHunger || 20);
+                const req = typeof this.player.getXPRequired === 'function' ? this.player.getXPRequired(this.player.xpLevel || 0) : 20;
+                this.updateXP(this.player.xp || 0, req, this.player.xpLevel || 0);
             }
 
             const closeBtn = document.getElementById('btn-inventory-close');
@@ -179,6 +207,11 @@
 
             if (typeof window !== 'undefined') {
                 window.addEventListener('keydown', (e) => {
+                    if (this.isTradingOpen && e.code === 'Escape') {
+                        if (typeof e.preventDefault === 'function') e.preventDefault();
+                        this.closeTradingModal();
+                        return;
+                    }
                     if (!this.isInventoryOpen) return;
                     if (e.code === 'Escape') {
                         if (typeof e.preventDefault === 'function') e.preventDefault();
@@ -285,8 +318,34 @@
             }
             if (this.isInventoryOpen) {
                 this.buildCraftingGrid();
+                this.buildSmeltingGrid();
+                this.buildEnchantingGrid();
                 this.buildInventoryGrid();
             }
+            if (this.isTradingOpen && this.activeVillager) {
+                this.renderTradingList();
+            }
+        }
+
+        removeItem(blockId, count = 1) {
+            if (!blockId || blockId <= 0) return false;
+            const cur = this.getItemCount(blockId);
+            if (cur <= 0) return false;
+            this.inventoryCounts[blockId] = Math.max(0, cur - count);
+            this.buildHotbar();
+            if (this.player && this.player.selectedSlot !== undefined) {
+                this.updateActiveSlot(this.player.selectedSlot);
+            }
+            if (this.isInventoryOpen) {
+                this.buildCraftingGrid();
+                this.buildSmeltingGrid();
+                this.buildEnchantingGrid();
+                this.buildInventoryGrid();
+            }
+            if (this.isTradingOpen && this.activeVillager) {
+                this.renderTradingList();
+            }
+            return true;
         }
 
         isFreeCraftingMode() {
@@ -413,7 +472,16 @@
                 const bDef = Blocks.BLOCK_DEFS ? Blocks.BLOCK_DEFS[blockId] : null;
 
                 const slot = document.createElement('div');
-                slot.className = 'hotbar-slot';
+                let slotCls = 'hotbar-slot';
+                if (this.player && this.player.enchantments && Blocks.BLOCKS) {
+                    const ench = this.player.enchantments;
+                    if ((blockId === Blocks.BLOCKS.PICKAXE_DIAMOND && ench.efficiency > 0) ||
+                        (blockId === Blocks.BLOCKS.SWORD_DIAMOND && ench.sharpness > 0) ||
+                        (blockId === Blocks.BLOCKS.BOW && ench.flame > 0)) {
+                        slotCls += ' enchanted-slot';
+                    }
+                }
+                slot.className = slotCls;
                 slot.id = `slot-${i}`;
                 slot.title = bDef ? bDef.name : '';
 
@@ -558,16 +626,367 @@
             }
         }
 
-        openInventory() {
+        openInventory(station = null) {
             this.isInventoryOpen = true;
+            if (station) {
+                this.switchInventoryStation(station);
+            }
             if (this.inventoryOverlayEl) {
                 this.inventoryOverlayEl.style.display = 'flex';
             }
             this.buildCraftingGrid();
+            this.buildSmeltingGrid();
+            this.buildEnchantingGrid();
             this.buildInventoryGrid();
             if (this.player && typeof this.player.unlock === 'function') {
                 this.player.unlock();
             }
+        }
+
+        switchInventoryStation(station = 'crafting') {
+            this.activeStation = station;
+            if (typeof document === 'undefined') return;
+            const craftSec = document.getElementById('crafting-section');
+            const smeltSec = document.getElementById('smelting-section');
+            const enchSec = document.getElementById('enchanting-section');
+            if (craftSec) craftSec.style.display = (station === 'crafting') ? 'block' : 'none';
+            if (smeltSec) smeltSec.style.display = (station === 'smelting') ? 'block' : 'none';
+            if (enchSec) enchSec.style.display = (station === 'enchanting') ? 'block' : 'none';
+
+            const tabs = document.querySelectorAll ? document.querySelectorAll('.station-tab') : [];
+            if (tabs && tabs.forEach) {
+                tabs.forEach((tab) => {
+                    const st = tab.getAttribute ? tab.getAttribute('data-station') : (tab.dataset ? tab.dataset.station : '');
+                    if (st === station) tab.classList.add('active');
+                    else tab.classList.remove('active');
+                });
+            }
+        }
+
+        buildSmeltingGrid() {
+            if (typeof document === 'undefined') return;
+            const gridEl = document.getElementById('smelting-grid');
+            if (!gridEl) return;
+            gridEl.innerHTML = '';
+
+            const recipes = (Blocks && Blocks.SMELTING_RECIPES) ? Blocks.SMELTING_RECIPES : [];
+            const isFree = this.isFreeCraftingMode();
+
+            for (const recipe of recipes) {
+                if (!recipe || !recipe.output) continue;
+                const canSmelt = this.canCraftRecipe(recipe);
+                const card = document.createElement('div');
+                card.className = `crafting-recipe ${canSmelt ? 'craftable' : 'locked'}`;
+                card.title = canSmelt ? `Vytavit ${recipe.name}` : `Nedostatek surovin pro: ${recipe.name}`;
+
+                const iconCanvas = document.createElement('canvas');
+                iconCanvas.width = 32;
+                iconCanvas.height = 32;
+                const ictx = typeof iconCanvas.getContext === 'function' ? iconCanvas.getContext('2d') : null;
+                if (ictx && this.atlasCanvas && Blocks) {
+                    ictx.imageSmoothingEnabled = false;
+                    const tileIdx = typeof Blocks.getBlockFaceTexture === 'function' ? Blocks.getBlockFaceTexture(recipe.output.id, 0) : 0;
+                    const tx = (tileIdx % 16) * 16;
+                    const ty = Math.floor(tileIdx / 16) * 16;
+                    ictx.drawImage(this.atlasCanvas, tx, ty, 16, 16, 0, 0, 32, 32);
+                }
+
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'crafting-recipe-info';
+
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'crafting-recipe-title';
+                titleDiv.innerText = `${recipe.name} (+${recipe.xp || 3} XP)`;
+
+                const ingDiv = document.createElement('div');
+                ingDiv.className = 'crafting-recipe-ingredients';
+                if (isFree) {
+                    ingDiv.innerText = 'Zdarma (Crafting mód)';
+                    ingDiv.style.color = '#88ff88';
+                } else {
+                    const ingList = (recipe.ingredients || []).map(ing => {
+                        const bDef = Blocks && Blocks.BLOCK_DEFS ? Blocks.BLOCK_DEFS[ing.id] : null;
+                        const name = bDef ? bDef.name : `Item #${ing.id}`;
+                        return `${name}: ${this.getItemCount(ing.id)}/${ing.count}`;
+                    });
+                    ingDiv.innerText = ingList.join(', ');
+                }
+
+                infoDiv.appendChild(titleDiv);
+                infoDiv.appendChild(ingDiv);
+                card.appendChild(iconCanvas);
+                card.appendChild(infoDiv);
+                card.addEventListener('click', () => this.smeltRecipe(recipe));
+                gridEl.appendChild(card);
+            }
+        }
+
+        smeltRecipe(recipe) {
+            if (!recipe || !this.canCraftRecipe(recipe)) {
+                this.showToast('Nedostatek rudy, surovin nebo uhlí k tavení!');
+                return false;
+            }
+            if (!this.isFreeCraftingMode()) {
+                for (const ing of recipe.ingredients) {
+                    this.inventoryCounts[ing.id] = Math.max(0, (this.inventoryCounts[ing.id] || 0) - ing.count);
+                }
+            }
+            const outCount = (recipe.output && recipe.output.count) || 1;
+            const outId = recipe.output ? recipe.output.id : 1;
+            this.inventoryCounts[outId] = (this.inventoryCounts[outId] || 0) + outCount;
+
+            const slot = this.player ? this.player.selectedSlot : 0;
+            this.setHotbarBlock(slot, outId);
+
+            if (this.player) {
+                if (typeof this.player.addXP === 'function') {
+                    this.player.addXP(recipe.xp || 4);
+                }
+                if (this.player.audio && typeof this.player.audio.playCraft === 'function') {
+                    this.player.audio.playCraft();
+                }
+            }
+
+            this.showToast(`Vytaveno: ${recipe.name}!`);
+            this.buildSmeltingGrid();
+            this.buildCraftingGrid();
+            this.buildInventoryGrid();
+            return true;
+        }
+
+        buildEnchantingGrid() {
+            if (typeof document === 'undefined') return;
+            const statusEl = document.getElementById('enchant-xp-status');
+            const curLevel = this.player ? (this.player.xpLevel || 0) : 0;
+            if (statusEl) {
+                statusEl.innerText = `Tvé XP: Level ${curLevel}`;
+            }
+
+            const gridEl = document.getElementById('enchanting-grid');
+            if (!gridEl) return;
+            gridEl.innerHTML = '';
+
+            const enchants = (Blocks && Blocks.ENCHANTMENTS) ? Object.values(Blocks.ENCHANTMENTS) : [];
+            const isFree = this.isFreeCraftingMode();
+            const B = Blocks && Blocks.BLOCKS ? Blocks.BLOCKS : {};
+
+            for (const ench of enchants) {
+                if (!ench) continue;
+                const currentRank = (this.player && this.player.enchantments && this.player.enchantments[ench.id]) ? this.player.enchantments[ench.id] : 0;
+                const isMax = currentRank >= (ench.maxLevel || 3);
+                const levelCost = (ench.costLevels || 2) + currentRank;
+                const canAfford = !isMax && (isFree || curLevel >= levelCost);
+
+                const card = document.createElement('div');
+                card.className = `crafting-recipe ${canAfford ? 'craftable' : 'locked'}`;
+                card.title = isMax ? 'Maximální úroveň očarování' : ench.desc;
+
+                const iconCanvas = document.createElement('canvas');
+                iconCanvas.width = 32;
+                iconCanvas.height = 32;
+                const ictx = typeof iconCanvas.getContext === 'function' ? iconCanvas.getContext('2d') : null;
+                if (ictx && this.atlasCanvas && Blocks) {
+                    ictx.imageSmoothingEnabled = false;
+                    let targetId = B.PICKAXE_DIAMOND || 37;
+                    if (ench.target === 'sword') targetId = B.SWORD_DIAMOND || 38;
+                    else if (ench.target === 'bow') targetId = B.BOW || 51;
+                    const tileIdx = typeof Blocks.getBlockFaceTexture === 'function' ? Blocks.getBlockFaceTexture(targetId, 0) : 0;
+                    const tx = (tileIdx % 16) * 16;
+                    const ty = Math.floor(tileIdx / 16) * 16;
+                    ictx.drawImage(this.atlasCanvas, tx, ty, 16, 16, 0, 0, 32, 32);
+                }
+
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'crafting-recipe-info';
+
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'crafting-recipe-title';
+                titleDiv.innerText = `${ench.name} [${currentRank}/${ench.maxLevel}]`;
+
+                const descDiv = document.createElement('div');
+                descDiv.className = 'crafting-recipe-ingredients';
+                if (isMax) {
+                    descDiv.innerText = 'MAX ÚROVEŇ';
+                    descDiv.style.color = '#d58cff';
+                } else {
+                    descDiv.innerText = isFree ? 'Zdarma (Volný režim)' : `Cena: ${levelCost} XP Levelů • ${ench.desc}`;
+                    descDiv.style.color = canAfford ? '#77eeff' : '#ff8888';
+                }
+
+                infoDiv.appendChild(titleDiv);
+                infoDiv.appendChild(descDiv);
+                card.appendChild(iconCanvas);
+                card.appendChild(infoDiv);
+                card.addEventListener('click', () => this.enchantItem(ench.id));
+                gridEl.appendChild(card);
+            }
+        }
+
+        enchantItem(enchantId) {
+            const ench = (Blocks && Blocks.ENCHANTMENTS) ? Blocks.ENCHANTMENTS[enchantId] : null;
+            if (!ench || !this.player) return false;
+
+            if (!this.player.enchantments) {
+                this.player.enchantments = { efficiency: 0, sharpness: 0, flame: 0 };
+            }
+            const currentRank = this.player.enchantments[enchantId] || 0;
+            if (currentRank >= (ench.maxLevel || 3)) {
+                this.showToast(`${ench.name} je již na maximální úrovni!`);
+                return false;
+            }
+
+            const levelCost = (ench.costLevels || 2) + currentRank;
+            if (!this.isFreeCraftingMode() && (this.player.xpLevel || 0) < levelCost) {
+                this.showToast(`Potřebuješ alespoň XP Level ${levelCost}!`);
+                return false;
+            }
+
+            if (!this.isFreeCraftingMode()) {
+                this.player.xpLevel = Math.max(0, this.player.xpLevel - levelCost);
+            }
+            this.player.enchantments[enchantId] = currentRank + 1;
+
+            if (typeof this.player.getXPRequired === 'function') {
+                this.updateXP(this.player.xp, this.player.getXPRequired(this.player.xpLevel), this.player.xpLevel);
+            }
+            if (this.player.audio && typeof this.player.audio.playLevelUp === 'function') {
+                this.player.audio.playLevelUp();
+            }
+
+            this.showToast(`Očarováno: ${ench.name} ${this.player.enchantments[enchantId]}!`);
+            this.buildEnchantingGrid();
+            this.buildHotbar();
+            if (this.player.selectedSlot !== undefined) {
+                this.updateActiveSlot(this.player.selectedSlot);
+            }
+            return true;
+        }
+
+        openTradingModal(villager) {
+            if (!villager) return;
+            this.activeVillager = villager;
+            this.isTradingOpen = true;
+            if (this.isInventoryOpen) this.closeInventory();
+            if (!this.tradingOverlayEl && typeof document !== 'undefined') {
+                this.tradingOverlayEl = document.getElementById('trading-overlay');
+            }
+            if (this.tradingOverlayEl) {
+                this.tradingOverlayEl.style.display = 'flex';
+            }
+            this.renderTradingList();
+            if (this.player && typeof this.player.unlock === 'function') {
+                this.player.unlock();
+            }
+        }
+
+        closeTradingModal() {
+            this.isTradingOpen = false;
+            this.activeVillager = null;
+            if (this.tradingOverlayEl) {
+                this.tradingOverlayEl.style.display = 'none';
+            }
+            if (this.player && typeof this.player.lock === 'function') {
+                this.player.lock();
+            }
+        }
+
+        renderTradingList() {
+            if (typeof document === 'undefined' || !this.activeVillager) return;
+            const v = this.activeVillager;
+            const nameEl = document.getElementById('trading-villager-name');
+            const lvlEl = document.getElementById('trading-villager-level');
+            const emEl = document.getElementById('trading-emerald-status');
+            const listEl = document.getElementById('trading-list');
+
+            const emeraldId = (Blocks && Blocks.BLOCKS && Blocks.BLOCKS.EMERALD_ORE) ? Blocks.BLOCKS.EMERALD_ORE : 39;
+            const levelNames = { 1: 'Novic', 2: 'Tovaryš', 3: 'Mistr' };
+            if (nameEl) nameEl.innerText = v.villagerName || 'Vesničan';
+            if (lvlEl) lvlEl.innerText = `Úroveň ${v.tradeLevel || 1} (${levelNames[v.tradeLevel || 1] || 'Mistr'})`;
+            if (emEl) emEl.innerText = `Tvoje Smaragdy: ${this.getItemCount(emeraldId)}`;
+            if (!listEl) return;
+
+            listEl.innerHTML = '';
+            const trades = Array.isArray(v.trades) ? v.trades : [];
+            const isFree = this.isFreeCraftingMode();
+
+            trades.forEach((tr, idx) => {
+                const unlocked = (v.tradeLevel || 1) >= (tr.minLevel || 1);
+                const hasItems = isFree || this.getItemCount(tr.costId) >= tr.costCount;
+
+                const card = document.createElement('div');
+                card.className = `trade-card ${unlocked ? '' : 'locked'}`;
+
+                const info = document.createElement('div');
+                info.className = 'trade-info';
+                const title = document.createElement('div');
+                title.className = 'trade-title';
+                title.innerText = tr.name;
+                const sub = document.createElement('div');
+                sub.className = 'trade-sub';
+                const costDef = Blocks && Blocks.BLOCK_DEFS ? Blocks.BLOCK_DEFS[tr.costId] : null;
+                const costName = costDef ? costDef.name : `Item #${tr.costId}`;
+                sub.innerText = unlocked
+                    ? `Máš: ${this.getItemCount(tr.costId)}x ${costName} • Odměna +${tr.xp || 4} XP`
+                    : `Odemkne se na Úrovni vesničana ${tr.minLevel}`;
+
+                info.appendChild(title);
+                info.appendChild(sub);
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'trade-btn';
+                btn.innerText = unlocked ? 'Obchodovat' : 'Zamčeno';
+                btn.disabled = !(unlocked && hasItems);
+                btn.addEventListener('click', () => this.executeTrade(idx));
+
+                card.appendChild(info);
+                card.appendChild(btn);
+                listEl.appendChild(card);
+            });
+        }
+
+        executeTrade(tradeIndex) {
+            const v = this.activeVillager;
+            if (!v || !Array.isArray(v.trades) || !v.trades[tradeIndex]) return false;
+            const tr = v.trades[tradeIndex];
+            if ((v.tradeLevel || 1) < (tr.minLevel || 1)) return false;
+
+            const isFree = this.isFreeCraftingMode();
+            if (!isFree && this.getItemCount(tr.costId) < tr.costCount) {
+                this.showToast('Nemáš dostatek předmětů pro tento obchod!');
+                return false;
+            }
+
+            if (!isFree) {
+                this.inventoryCounts[tr.costId] = Math.max(0, (this.inventoryCounts[tr.costId] || 0) - tr.costCount);
+            }
+            this.addCollectedItem(tr.giveId, tr.giveCount);
+
+            const slot = this.player ? this.player.selectedSlot : 0;
+            this.setHotbarBlock(slot, tr.giveId);
+
+            // Level up villager trade tier
+            v.tradeXP = (v.tradeXP || 0) + 1;
+            const prevLvl = v.tradeLevel || 1;
+            if (v.tradeXP >= 4) v.tradeLevel = 3;
+            else if (v.tradeXP >= 2) v.tradeLevel = 2;
+
+            if (this.player) {
+                if (typeof this.player.addXP === 'function') {
+                    this.player.addXP(tr.xp || 4);
+                }
+                if (this.player.audio && typeof this.player.audio.playVillagerSound === 'function') {
+                    this.player.audio.playVillagerSound();
+                }
+            }
+
+            if (v.tradeLevel > prevLvl) {
+                this.showToast(`${v.villagerName} postoupil na úroveň ${v.tradeLevel}!`);
+            } else {
+                this.showToast(`Obchod úspěšný: ${tr.name}!`);
+            }
+            this.renderTradingList();
+            return true;
         }
 
         closeInventory() {
@@ -660,12 +1079,14 @@
             }
 
             this.buildCraftingGrid();
+            this.buildSmeltingGrid();
+            this.buildEnchantingGrid();
             this.buildHotbar();
             this.buildInventoryGrid();
         }
 
-        updateHealth(health) {
-            if (!this.heartsBarEl) {
+        updateHealth(health, absorption = 0) {
+            if (!this.heartsBarEl && typeof document !== 'undefined') {
                 this.heartsBarEl = document.getElementById('hearts-bar');
             }
             if (!this.heartsBarEl) return;
@@ -673,7 +1094,9 @@
             if (hearts && hearts.forEach) {
                 hearts.forEach((heart, idx) => {
                     const heartHp = (idx + 1) * 2;
-                    if (health >= heartHp) {
+                    if (absorption > 0 && idx < Math.ceil(absorption / 2)) {
+                        heart.className = 'heart golden';
+                    } else if (health >= heartHp) {
                         heart.className = 'heart';
                     } else if (health === heartHp - 1) {
                         heart.className = 'heart half';
@@ -681,6 +1104,39 @@
                         heart.className = 'heart empty';
                     }
                 });
+            }
+        }
+
+        updateHunger(hunger, maxHunger = 20) {
+            if (!this.hungerBarEl && typeof document !== 'undefined') {
+                this.hungerBarEl = document.getElementById('hunger-bar');
+            }
+            if (!this.hungerBarEl) return;
+            const sticks = this.hungerBarEl.querySelectorAll ? this.hungerBarEl.querySelectorAll('.drumstick') : [];
+            if (sticks && sticks.forEach) {
+                sticks.forEach((stick, idx) => {
+                    const threshold = (idx + 1) * (maxHunger / 10);
+                    if (hunger >= threshold - 0.01) {
+                        stick.className = 'drumstick';
+                    } else if (hunger >= threshold - 1.01) {
+                        stick.className = 'drumstick half';
+                    } else {
+                        stick.className = 'drumstick empty';
+                    }
+                });
+            }
+        }
+
+        updateXP(xp, maxXp = 20, level = 0) {
+            if (typeof document === 'undefined') return;
+            if (!this.xpBarFillEl) this.xpBarFillEl = document.getElementById('xp-bar-fill');
+            if (!this.xpLevelBadgeEl) this.xpLevelBadgeEl = document.getElementById('xp-level-badge');
+            const pct = Math.max(0, Math.min(100, (xp / Math.max(1, maxXp)) * 100));
+            if (this.xpBarFillEl) {
+                this.xpBarFillEl.style.width = `${pct}%`;
+            }
+            if (this.xpLevelBadgeEl) {
+                this.xpLevelBadgeEl.innerText = `${level}`;
             }
         }
 
@@ -867,6 +1323,9 @@
                     else if (bId === B.FLOWER_YELLOW || bId === 35 || bId === B.TORCH || bId === 31) { r = 255; gCol = 225; bCol = 55; }
                     else if (bId === B.WOOD || bId === 5 || bId === B.PLANKS || bId === 7) { r = 148; gCol = 108; bCol = 62; }
                     else if (bId === B.BRICK || bId === 8 || bId === B.TNT || bId === 15 || bId === B.BED || bId === 32) { r = 190; gCol = 64; bCol = 54; }
+                    else if (bId === B.WHEAT || bId === 45) { r = 232; gCol = 198; bCol = 62; }
+                    else if (bId === B.LANTERN || bId === 47) { r = 255; gCol = 210; bCol = 75; }
+                    else if (bId === B.EMERALD_BLOCK || bId === 40) { r = 40; gCol = 215; bCol = 95; }
 
                     // Subtle height shading
                     const shade = Math.max(0.65, Math.min(1.25, 0.8 + (topY - 12) * 0.018));
@@ -876,6 +1335,24 @@
 
                     ctx.fillStyle = `rgb(${fr},${fg},${fb})`;
                     ctx.fillRect((dx + radius) * cellSize, (dz + radius) * cellSize, Math.ceil(cellSize), Math.ceil(cellSize));
+                }
+            }
+
+            // Draw nearby village markers
+            if (this.world && Array.isArray(this.world.villages)) {
+                for (let vi = 0; vi < this.world.villages.length; vi++) {
+                    const v = this.world.villages[vi];
+                    const vdx = v.x - this.player.position.x;
+                    const vdz = v.z - this.player.position.z;
+                    if (Math.abs(vdx) < radius && Math.abs(vdz) < radius) {
+                        const vx = (vdx + radius) * cellSize;
+                        const vz = (vdz + radius) * cellSize;
+                        ctx.strokeStyle = '#ffdd55';
+                        ctx.lineWidth = 1.5;
+                        if (typeof ctx.strokeRect === 'function') {
+                            ctx.strokeRect(vx - 3, vz - 3, 6, 6);
+                        }
+                    }
                 }
             }
 
@@ -889,7 +1366,10 @@
                     if (Math.abs(mdx) < radius && Math.abs(mdz) < radius) {
                         const mx = (mdx + radius) * cellSize;
                         const mz = (mdz + radius) * cellSize;
-                        ctx.fillStyle = m.hostile ? '#ff3333' : '#55ff55';
+                        if (m.hostile) ctx.fillStyle = '#ff3333';
+                        else if (m.type === 'villager') ctx.fillStyle = '#33ddff';
+                        else if (m.type === 'iron_golem') ctx.fillStyle = '#ffffff';
+                        else ctx.fillStyle = '#55ff55';
                         ctx.fillRect(mx - 1.5, mz - 1.5, 3, 3);
                     }
                 }
