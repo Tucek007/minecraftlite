@@ -173,6 +173,8 @@
             player.position.z = spawn.z;
             player.fallDistance = 0;
             player.onGround = true;
+        } else {
+            ensurePlayerDrySpawn();
         }
 
         // 7. Lighting & Atmosphere
@@ -203,6 +205,23 @@
 
         // 12. Start Loop
         requestAnimationFrame(animate);
+    }
+
+    function ensurePlayerDrySpawn() {
+        if (!player || !world || player.isFlying) return;
+        const inWater = world.isWater(player.position.x, player.position.y + 0.2, player.position.z) ||
+                        world.isWater(player.position.x, player.position.y + 0.9, player.position.z);
+        if (inWater) {
+            const spawn = player.getSafeSpawnPosition(player.position.x, player.position.z);
+            player.position.x = spawn.x;
+            player.position.y = spawn.y;
+            player.position.z = spawn.z;
+            player.velocity.x = 0;
+            player.velocity.y = 0;
+            player.velocity.z = 0;
+            player.fallDistance = 0;
+            player.onGround = true;
+        }
     }
 
     function saveGameState(silent = false) {
@@ -1047,6 +1066,7 @@
                     if (window.UI) {
                         window.UI.world = world;
                     }
+                    ensurePlayerDrySpawn();
                     loadSurroundingChunks(true);
                     window.UI.showToast('World & Player Loaded Successfully!');
                     resumeGame();

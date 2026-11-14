@@ -511,4 +511,49 @@ describe('PlayerController tests', () => {
         player.enchantments.sharpness = 2;
         assert.strictEqual(player.getAttackDamage(Blocks.BLOCKS.SWORD_DIAMOND), baseSword + 8);
     });
+
+    test('getSafeSpawnPosition and respawn skip water-submerged columns and find nearest dry land', () => {
+        const { camera, domElement, audio } = createMockSetup();
+        // Lake around (8, 8): columns with max(|x-8|, |z-8|) <= 2 have solid floor at y=14 and water at y=15..18.
+        // Surrounding dry land at distance >= 3 has solid ground up to y=20 and air above.
+        const isLakeCol = (bx, bz) => Math.max(Math.abs(bx - 8), Math.abs(bz - 8)) <= 2;
+        const lakeWorld = {
+            getBlock: (x, y, z) => {
+                const bx = Math.floor(x);
+                const bz = Math.floor(z);
+                if (isLakeCol(bx, bz)) {
+                    if (y <= 14) return 9; // SAND
+                    if (y <= 18) return 11; // WATER
+                    return 0;
+                }
+                return y <= 20 ? 1 : 0; // GRASS up to y=20
+            },
+            isSolid: (x, y, z) => {
+                const bx = Math.floor(x);
+                const bz = Math.floor(z);
+                if (isLakeCol(bx, bz)) return y <= 14;
+                return y <= 20;
+            },
+            isWater: (x, y, z) => {
+                const bx = Math.floor(x);
+                const bz = Math.floor(z);
+                return isLakeCol(bx, bz) && y >= 15 && y <= 18;
+            },
+            isLava: () => false
+        };
+
+        const player = new PlayerController(camera, domElement, lakeWorld, audio);
+        const spawn = player.getSafeSpawnPosition(8.5, 8.5);
+
+        assert.strictEqual(lakeWorld.isWater(spawn.x, spawn.y, spawn.z), false, 'Spawn must not be underwater');
+        assert.strictEqual(lakeWorld.isWater(spawn.x, spawn.y + 0.9, spawn.z), false, 'Spawn torso must not be underwater');
+        assert.ok(!isLakeCol(Math.floor(spawn.x), Math.floor(spawn.z)), 'Spawn column must move out of lake');
+        assert.strictEqual(Math.floor(spawn.y), 21, 'Player should stand on dry land at y=21.1');
+
+        // Submerged bed/spawnPoint column should also fall back to nearest dry land on respawn
+        player.spawnPoint = { x: 8.5, y: 16.0, z: 8.5 };
+        player.respawn();
+        assert.strictEqual(lakeWorld.isWater(player.position.x, player.position.y + 0.2, player.position.z), false, 'Respawn must not drop player into water');
+        assert.strictEqual(lakeWorld.isSolid(Math.floor(player.position.x), Math.floor(player.position.y) - 1, Math.floor(player.position.z)), true, 'Respawn must place player on solid ground');
+    });
 });

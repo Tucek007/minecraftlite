@@ -905,19 +905,103 @@
             this.respawn();
         }
 
-        getSafeSpawnPosition(spawnX = 8.5, spawnZ = 8.5) {
-            let groundY = 25;
-            if (this.world) {
-                if (typeof this.world.getOrCreateChunk === 'function') {
-                    const cx = Math.floor(spawnX / 16);
-                    const cz = Math.floor(spawnZ / 16);
-                    this.world.getOrCreateChunk(cx, cz);
+        _isSpawnLiquid(bx, by, bz) {
+            if (!this.world) return false;
+            if (typeof this.world.isWater === 'function' && this.world.isWater(bx, by, bz)) return true;
+            if (typeof this.world.isLava === 'function' && this.world.isLava(bx, by, bz)) return true;
+            if (typeof this.world.getBlock === 'function') {
+                const b = this.world.getBlock(bx, by, bz);
+                if (b === 11 || b === 30) return true;
+            }
+            return false;
+        }
+
+        _evaluateSpawnColumn(bx, bz, enforceDryElevation = true) {
+            if (!this.world) return 25;
+            const isChunkedWorld = (typeof this.world.getOrCreateChunk === 'function');
+            if (isChunkedWorld) {
+                this.world.getOrCreateChunk(Math.floor(bx / 16), Math.floor(bz / 16));
+            }
+            const maxHeight = (g && g.World && g.World.CHUNK_HEIGHT)
+                ? g.World.CHUNK_HEIGHT
+                : ((typeof window !== 'undefined' && window.World && window.World.CHUNK_HEIGHT) ? window.World.CHUNK_HEIGHT : 64);
+
+            for (let y = maxHeight - 1; y >= 0; y--) {
+                if (this._isSpawnLiquid(bx, y, bz)) {
+                    return null;
                 }
-                const maxHeight = (typeof window !== 'undefined' && window.World && window.World.CHUNK_HEIGHT) ? window.World.CHUNK_HEIGHT : 64;
-                for (let y = maxHeight - 1; y >= 0; y--) {
-                    if (this.world.isSolid(Math.floor(spawnX), y, Math.floor(spawnZ))) {
-                        groundY = y + 1;
-                        break;
+                if (this.world.isSolid(bx, y, bz)) {
+                    const groundY = y + 1;
+                    const topBlock = (typeof this.world.getBlock === 'function') ? this.world.getBlock(bx, y, bz) : 0;
+                    // Reject cactus (23) and tree leaves (6, 29)
+                    if (topBlock === 23 || topBlock === 6 || topBlock === 29) return null;
+                    // Require 2 blocks of clear, non-liquid headroom
+                    if (this.world.isSolid(bx, groundY, bz) || this.world.isSolid(bx, groundY + 1, bz)) return null;
+                    if (this._isSpawnLiquid(bx, groundY, bz) || this._isSpawnLiquid(bx, groundY + 1, bz)) return null;
+
+                    if (isChunkedWorld) {
+                        if (enforceDryElevation && groundY <= 19) return null;
+                        if (
+                            this._isSpawnLiquid(bx + 1, y, bz) ||
+                            this._isSpawnLiquid(bx - 1, y, bz) ||
+                            this._isSpawnLiquid(bx, y, bz + 1) ||
+                            this._isSpawnLiquid(bx, y, bz - 1)
+                        ) {
+                            return null;
+                        }
+                    }
+                    return groundY;
+                }
+            }
+            return null;
+        }
+
+        getSafeSpawnPosition(spawnX = 8.5, spawnZ = 8.5) {
+            const groundY = 25;
+            if (this.world) {
+                const originBx = Math.floor(spawnX);
+                const originBz = Math.floor(spawnZ);
+                const originGround = this._evaluateSpawnColumn(originBx, originBz, true);
+                if (originGround !== null) {
+                    return { x: spawnX, y: originGround + 0.1, z: spawnZ };
+                }
+
+                for (let r = 1; r <= 48; r++) {
+                    const ringCandidates = [];
+                    for (let dx = -r; dx <= r; dx++) {
+                        for (let dz = -r; dz <= r; dz++) {
+                            if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+                            ringCandidates.push({ dx, dz, distSq: dx * dx + dz * dz });
+                        }
+                    }
+                    ringCandidates.sort((a, b) => a.distSq - b.distSq);
+                    for (let i = 0; i < ringCandidates.length; i++) {
+                        const c = ringCandidates[i];
+                        const bx = originBx + c.dx;
+                        const bz = originBz + c.dz;
+                        const gy = this._evaluateSpawnColumn(bx, bz, true);
+                        if (gy !== null) {
+                            return { x: bx + 0.5, y: gy + 0.1, z: bz + 0.5 };
+                        }
+                    }
+                }
+
+                // Fallback: relax groundY > 19 constraint if all nearby land sits right at sea level
+                const relaxedOrigin = this._evaluateSpawnColumn(originBx, originBz, false);
+                if (relaxedOrigin !== null) {
+                    return { x: spawnX, y: relaxedOrigin + 0.1, z: spawnZ };
+                }
+                for (let r = 1; r <= 48; r++) {
+                    for (let dx = -r; dx <= r; dx++) {
+                        for (let dz = -r; dz <= r; dz++) {
+                            if (Math.max(Math.abs(dx), Math.abs(dz)) !== r) continue;
+                            const bx = originBx + dx;
+                            const bz = originBz + dz;
+                            const gy = this._evaluateSpawnColumn(bx, bz, false);
+                            if (gy !== null) {
+                                return { x: bx + 0.5, y: gy + 0.1, z: bz + 0.5 };
+                            }
+                        }
                     }
                 }
             }
@@ -938,7 +1022,12 @@
             if (
                 this.spawnPoint &&
                 typeof this.spawnPoint.y === 'number' &&
-                (!this.world || !this.world.isSolid(Math.floor(targetX), Math.floor(this.spawnPoint.y), Math.floor(targetZ)))
+                Math.floor(spawn.x) === Math.floor(targetX) &&
+                Math.floor(spawn.z) === Math.floor(targetZ) &&
+                (!this.world || (
+                    !this.world.isSolid(Math.floor(targetX), Math.floor(this.spawnPoint.y), Math.floor(targetZ)) &&
+                    !this._isSpawnLiquid(Math.floor(targetX), Math.floor(this.spawnPoint.y), Math.floor(targetZ))
+                ))
             ) {
                 spawn.y = this.spawnPoint.y;
             }
